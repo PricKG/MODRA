@@ -1,0 +1,3 @@
+#pragma once
+
+#define MODRA_VERSION "@PROJECT_VERSION@"
