@@ -71,6 +71,7 @@ add_library(modra_core
     "${MODRA_GENERATED_MIGRATIONS_SOURCE}"
     src/application/AppInfo.cpp
     src/application/DashboardService.cpp
+    src/application/NoteDocument.cpp
     src/application/NoteService.cpp
     src/application/ProjectService.cpp
     src/application/TaskService.cpp
@@ -135,6 +136,7 @@ if(BUILD_TESTING)
         tests/DashboardTests.cpp
         tests/InfrastructureTests.cpp
         tests/GlobalTaskTests.cpp
+        tests/NoteDocumentTests.cpp
         tests/NoteTests.cpp
         tests/ProjectTests.cpp
         tests/TaskTests.cpp

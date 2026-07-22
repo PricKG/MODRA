@@ -171,7 +171,34 @@ En el detalle, `o` vuelve a abrir el contenido en el editor externo; `p` abre el
 
 ### Editor externo
 
-MODRA crea un archivo temporal UTF-8, suspende temporalmente la interfaz, espera al editor y guarda el contenido únicamente cuando el proceso termina correctamente. Ante un error se conserva la nota original y se limpia el archivo temporal.
+MODRA edita el título y el cuerpo juntos en un archivo temporal UTF-8 con extensión `.md`. El documento siempre comienza con una ayuda identificada por `MODRA_DOCUMENT_V1`, seguida del primer encabezado `#`, que representa el título definitivo. Todo lo posterior es el cuerpo Markdown:
+
+````md
+<!--
+MODRA_DOCUMENT_V1
+
+Formato:
+- El primer encabezado "# " es el título del documento.
+- Todo lo que aparece después es el cuerpo en Markdown.
+- Se permiten subtítulos, listas, tablas, enlaces y bloques de código.
+-->
+
+# Problema de generación de PDF
+
+## Contexto
+
+El cierre mensual falla cuando...
+
+```sql
+SELECT * FROM monthly_closures;
+```
+````
+
+El comentario es únicamente una guía del archivo editable: no se guarda como contenido ni aparece en el detalle. El encabezado `#` debe tener un título y el cuerpo posterior no puede quedar vacío. Los encabezados `##`, listas, tablas, comentarios HTML y bloques de código del cuerpo se conservan sin intentar renderizar Markdown de forma completa.
+
+Al abrir una nota anterior, MODRA construye este documento usando el título y contenido ya almacenados; no se requiere migración ni se modifican notas sin que el usuario las edite. Si el título se cambia en el editor, el listado y el detalle utilizan el nuevo valor al guardar.
+
+MODRA suspende temporalmente la interfaz, espera al editor, interpreta el documento y persiste título y cuerpo por separado en SQLite. El temporal se elimina después de guardar correctamente. Ante un fallo del editor, un formato inválido o un error de persistencia, la nota original permanece intacta y el temporal se conserva para recuperar el texto; el mensaje de error informa su ruta.
 
 El editor se resuelve en este orden:
 
@@ -192,6 +219,8 @@ Ejemplo de configuración:
 ```
 
 Los comandos con rutas que contienen espacios deben escribir el ejecutable entre comillas. MODRA lanza el proceso directamente y no envía el contenido Markdown a una shell.
+
+El intérprete reconoce solamente el formato controlado de MODRA: no es un parser Markdown general. El primer `# ` visible fuera de un bloque de código es el título; el resto se conserva como cuerpo.
 
 ## Dashboard
 

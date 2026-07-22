@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "application/NoteDocument.h"
 #include "domain/Note.h"
 #include "infrastructure/database/NoteRepository.h"
 #include "infrastructure/database/ProjectRepository.h"
@@ -28,6 +29,11 @@ struct NoteQuery {
     bool without_task = false;
 };
 
+struct EditedNoteDocument {
+    ParsedNoteDocument document;
+    std::filesystem::path temporary_file;
+};
+
 class NoteService {
 public:
     NoteService(Database& database,
@@ -47,7 +53,8 @@ public:
     Note set_favorite(std::int64_t id, bool favorite);
     Note archive(std::int64_t id);
     Note restore(std::int64_t id);
-    std::string edit_external(const std::string& title, const std::string& initial_content) const;
+    EditedNoteDocument edit_external(const std::string& title, const std::string& body) const;
+    void complete_external_edit(const std::filesystem::path& temporary_file) const;
 
 private:
     NoteInput normalize_and_validate(NoteInput input) const;

@@ -163,6 +163,8 @@ Esta es una de las áreas centrales:
 
 Las notas son personales, se almacenan como Markdown dentro de SQLite y pueden ser globales o relacionarse opcionalmente con un proyecto y una tarea. El editor externo configurado, `$VISUAL` o `$EDITOR` modifica el contenido extenso; MODRA no implementa un editor Markdown completo.
 
+Toda nota se presenta en el editor como un documento Markdown completo. El primer encabezado visible `# ` representa el título y el contenido posterior representa el cuerpo. El comentario `MODRA_DOCUMENT_V1` explica este formato, pero no forma parte del contenido visible. El título y el cuerpo continúan persistidos por separado; esta interpretación controlada no debe evolucionar hacia un parser Markdown general.
+
 Conocimiento no debe evolucionar hacia una wiki, colaboración, versionado, adjuntos ni documentación empresarial oficial. Jira y las fuentes externas continúan siendo la referencia oficial del equipo.
 
 ### Herramientas
@@ -416,6 +418,7 @@ Durante el trabajo:
 - El núcleo futuro es organización personal, notas y conocimiento.
 - La jerarquía es `Proyecto → Tarea`.
 - Las notas personales se guardan en Markdown dentro de SQLite y pueden ser globales o relacionarse opcionalmente con proyecto y tarea.
+- Toda nota se edita como un documento Markdown completo: el primer `# ` es el título, el contenido posterior es el cuerpo y `MODRA_DOCUMENT_V1` es una guía no visible; título y cuerpo se persisten por separado sin un parser Markdown general.
 - Las migraciones aplicadas son inmutables, viven únicamente en `migrations/*.sql` y se embeben en el ejecutable durante la compilación.
 - El contenido extenso se modifica mediante un editor externo; no se planifican wiki, colaboración, versionado ni adjuntos en esta etapa.
 - No existe el concepto funcional de módulos.

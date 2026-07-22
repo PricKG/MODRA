@@ -336,19 +336,73 @@ TEST_CASE("Editor resolution honors config VISUAL and EDITOR") {
 TEST_CASE("Controlled editor reads UTF-8 multiline content and cleans its temporary file") {
     NoteFixture fixture;
     configure_editor(fixture.paths.config, "--write");
-    const std::string edited = fixture.notes.edit_external("Prueba", "Contenido inicial");
-    CHECK(edited.find("Línea UTF-8") != std::string::npos);
-    CHECK(edited.find("```sql\nSELECT 1;") != std::string::npos);
+    const auto edited = fixture.notes.edit_external("Prueba", "Contenido inicial");
+    CHECK(edited.document.title == "Nota editada");
+    CHECK(edited.document.body.find("Línea UTF-8") != std::string::npos);
+    CHECK(edited.document.body.find("## Contexto") == 0);
+    CHECK(edited.document.body.find("| Clave | Valor |") != std::string::npos);
+    CHECK(edited.document.body.find("```sql\nSELECT 1;") != std::string::npos);
+    CHECK(edited.temporary_file.extension() == ".md");
+    CHECK(std::filesystem::is_regular_file(edited.temporary_file));
+    fixture.notes.complete_external_edit(edited.temporary_file);
     for (const auto& entry : std::filesystem::directory_iterator(fixture.paths.root))
         CHECK(entry.path().filename().string().find(".modra-note-") == std::string::npos);
+}
+
+TEST_CASE("An existing note opens as one document and can change title and body") {
+    NoteFixture fixture;
+    const auto created = fixture.notes.create({"Nota existente", modra::NoteType::technical, "Cuerpo existente"});
+    configure_editor(fixture.paths.config, "--verify-template");
+
+    const auto edited = fixture.notes.edit_external(created.title, created.content);
+    auto input = fixture.valid(edited.document.title);
+    input.type = created.type;
+    input.content = edited.document.body;
+    input.project_id = created.project_id;
+    const auto updated = fixture.notes.update(created.id, input);
+    fixture.notes.complete_external_edit(edited.temporary_file);
+
+    CHECK(updated.title == "Título cambiado desde Markdown");
+    CHECK(updated.content == "Cuerpo cambiado desde Markdown.\n");
+    CHECK(updated.content.find("MODRA_DOCUMENT_V1") == std::string::npos);
+    CHECK(updated.content.find("# Título cambiado") == std::string::npos);
+}
+
+TEST_CASE("An invalid edited document preserves the original note and temporary Markdown") {
+    NoteFixture fixture;
+    const auto created = fixture.notes.create(fixture.valid());
+    configure_editor(fixture.paths.config, "--invalid");
+
+    try {
+        static_cast<void>(fixture.notes.edit_external(created.title, created.content));
+        FAIL("The invalid document should have been rejected");
+    } catch (const std::exception& exception) {
+        const std::string message = exception.what();
+        CHECK(message.find("El documento debe contener un título") != std::string::npos);
+        CHECK(message.find("Archivo temporal conservado en:") != std::string::npos);
+    }
+    const auto stored = fixture.notes.find_by_id(created.id);
+    REQUIRE(stored);
+    CHECK(stored->title == created.title);
+    CHECK(stored->content == created.content);
+    bool markdown_preserved = false;
+    for (const auto& entry : std::filesystem::directory_iterator(fixture.paths.root))
+        if (entry.path().extension() == ".md") markdown_preserved = true;
+    CHECK(markdown_preserved);
 }
 
 TEST_CASE("An editor failure keeps the stored content unchanged") {
     NoteFixture fixture;
     const auto created = fixture.notes.create(fixture.valid());
     configure_editor(fixture.paths.config, "--fail");
-    CHECK_THROWS_WITH(fixture.notes.edit_external(created.title, created.content),
-                      "El editor externo terminó con error. La nota original no fue modificada.");
+    try {
+        static_cast<void>(fixture.notes.edit_external(created.title, created.content));
+        FAIL("The failing editor should have reported an error");
+    } catch (const std::exception& exception) {
+        const std::string message = exception.what();
+        CHECK(message.find("El editor externo terminó con error") != std::string::npos);
+        CHECK(message.find("Archivo temporal conservado en:") != std::string::npos);
+    }
     const auto stored = fixture.notes.find_by_id(created.id);
     REQUIRE(stored);
     CHECK(stored->content == created.content);
@@ -361,8 +415,14 @@ TEST_CASE("A missing editor reports an error and keeps the stored content") {
         std::ofstream output(fixture.paths.config, std::ios::trunc);
         output << nlohmann::json{{"editor", {{"command", "modra-editor-that-does-not-exist"}}}};
     }
-    CHECK_THROWS_WITH(fixture.notes.edit_external(created.title, created.content),
-                      "No se pudo iniciar el editor externo.");
+    try {
+        static_cast<void>(fixture.notes.edit_external(created.title, created.content));
+        FAIL("The missing editor should have reported an error");
+    } catch (const std::exception& exception) {
+        const std::string message = exception.what();
+        CHECK(message.find("No se pudo iniciar el editor externo") != std::string::npos);
+        CHECK(message.find("Archivo temporal conservado en:") != std::string::npos);
+    }
     REQUIRE(fixture.notes.find_by_id(created.id));
     CHECK(fixture.notes.find_by_id(created.id)->content == created.content);
 }

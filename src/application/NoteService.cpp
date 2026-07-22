@@ -134,8 +134,18 @@ Note NoteService::restore(std::int64_t id) {
     return note;
 }
 
-std::string NoteService::edit_external(const std::string& title, const std::string& initial_content) const {
-    return editor_.edit(title, initial_content);
+EditedNoteDocument NoteService::edit_external(const std::string& title, const std::string& body) const {
+    const auto edited = editor_.edit(title, build_note_document(title, body));
+    try {
+        return {parse_note_document(edited.content), edited.temporary_file};
+    } catch (const std::exception& exception) {
+        throw std::runtime_error(std::string(exception.what()) +
+                                 " Archivo temporal conservado en: " + edited.temporary_file.string());
+    }
+}
+
+void NoteService::complete_external_edit(const std::filesystem::path& temporary_file) const {
+    editor_.remove_temporary(temporary_file);
 }
 
 }  // namespace modra

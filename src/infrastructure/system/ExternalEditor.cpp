@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <fstream>
+#include <iterator>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -57,14 +58,6 @@ int run_process(const std::vector<std::string>& arguments) {
     return WIFEXITED(status) ? WEXITSTATUS(status) : 1;
 #endif
 }
-
-struct TemporaryFileCleanup {
-    std::filesystem::path path;
-    ~TemporaryFileCleanup() {
-        std::error_code error;
-        std::filesystem::remove(path, error);
-    }
-};
 
 }  // namespace
 
@@ -128,38 +121,53 @@ std::vector<std::string> ExternalEditor::split_command(const std::string& comman
     return arguments;
 }
 
-std::string ExternalEditor::edit(const std::string& title, const std::string& initial_content) const {
+ExternalEditResult ExternalEditor::edit(const std::string& title, const std::string& initial_content) const {
     std::filesystem::create_directories(temporary_directory_);
     const auto suffix = std::chrono::steady_clock::now().time_since_epoch().count();
     const auto temporary_file = temporary_directory_ / (".modra-note-" + std::to_string(suffix) + ".md");
-    TemporaryFileCleanup cleanup{temporary_file};
 
-    {
-        std::ofstream output(temporary_file, std::ios::binary | std::ios::trunc);
-        if (!output) throw std::runtime_error("No se pudo crear el archivo temporal de la nota.");
-        output.write(initial_content.data(), static_cast<std::streamsize>(initial_content.size()));
-        if (!output) throw std::runtime_error("No se pudo escribir el archivo temporal de la nota.");
-    }
+    try {
+        {
+            std::ofstream output(temporary_file, std::ios::binary | std::ios::trunc);
+            if (!output) throw std::runtime_error("No se pudo crear el archivo temporal de la nota.");
+            output.write(initial_content.data(), static_cast<std::streamsize>(initial_content.size()));
+            if (!output) throw std::runtime_error("No se pudo escribir el archivo temporal de la nota.");
+        }
 
 #ifdef _WIN32
-    constexpr bool is_windows = true;
+        constexpr bool is_windows = true;
 #else
-    constexpr bool is_windows = false;
+        constexpr bool is_windows = false;
 #endif
-    const std::string command = resolve_command(
-        config_path_, {environment_value("VISUAL"), environment_value("EDITOR"), is_windows});
-    auto arguments = split_command(command);
-    arguments.push_back(temporary_file.string());
-    spdlog::info("Opening external editor for note title length={}", title.size());
-    const int result = run_process(arguments);
-    if (result != 0) {
-        spdlog::error("External editor failed with exit code {}", result);
-        throw std::runtime_error("El editor externo terminó con error. La nota original no fue modificada.");
-    }
+        const std::string command = resolve_command(
+            config_path_, {environment_value("VISUAL"), environment_value("EDITOR"), is_windows});
+        auto arguments = split_command(command);
+        arguments.push_back(temporary_file.string());
+        spdlog::info("Opening external editor for note title length={}", title.size());
+        const int result = run_process(arguments);
+        if (result != 0) {
+            spdlog::error("External editor failed with exit code {}", result);
+            throw std::runtime_error("El editor externo terminó con error. La nota original no fue modificada.");
+        }
 
-    std::ifstream input(temporary_file, std::ios::binary);
-    if (!input) throw std::runtime_error("No se pudo leer el contenido devuelto por el editor.");
-    return std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+        std::ifstream input(temporary_file, std::ios::binary);
+        if (!input) throw std::runtime_error("No se pudo leer el contenido devuelto por el editor.");
+        return {std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()), temporary_file};
+    } catch (const std::exception& exception) {
+        if (std::filesystem::exists(temporary_file)) {
+            throw std::runtime_error(std::string(exception.what()) +
+                                     " Archivo temporal conservado en: " + temporary_file.string());
+        }
+        throw;
+    }
+}
+
+void ExternalEditor::remove_temporary(const std::filesystem::path& path) const {
+    std::error_code error;
+    const bool removed = std::filesystem::remove(path, error);
+    if (error || (!removed && std::filesystem::exists(path))) {
+        spdlog::warn("Could not remove note temporary file: {}", path.string());
+    }
 }
 
 }  // namespace modra

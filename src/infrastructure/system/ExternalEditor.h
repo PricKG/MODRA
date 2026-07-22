@@ -13,6 +13,11 @@ struct EditorEnvironment {
     bool windows = false;
 };
 
+struct ExternalEditResult {
+    std::string content;
+    std::filesystem::path temporary_file;
+};
+
 class ExternalEditor {
 public:
     ExternalEditor(std::filesystem::path config_path, std::filesystem::path temporary_directory);
@@ -20,7 +25,8 @@ public:
     static std::string resolve_command(const std::filesystem::path& config_path,
                                        const EditorEnvironment& environment);
     static std::vector<std::string> split_command(const std::string& command);
-    std::string edit(const std::string& title, const std::string& initial_content) const;
+    ExternalEditResult edit(const std::string& title, const std::string& initial_content) const;
+    void remove_temporary(const std::filesystem::path& path) const;
 
 private:
     std::filesystem::path config_path_;

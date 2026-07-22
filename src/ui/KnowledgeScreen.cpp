@@ -155,9 +155,9 @@ struct KnowledgeState {
         view = KnowledgeView::form;
     }
 
-    NoteInput form_input(const std::string& content) const {
+    NoteInput form_input(const std::string& title, const std::string& content) const {
         NoteInput input;
-        input.title = form_title;
+        input.title = title;
         input.type = note_types[static_cast<std::size_t>(form_type)];
         input.content = content;
         if (project_selected > 0)
@@ -173,36 +173,46 @@ struct KnowledgeState {
             error = "El título es obligatorio.";
             return;
         }
-        const std::string initial = editing ? form_content : "# " + form_title + "\n\n";
+        std::optional<EditedNoteDocument> edited;
         try {
-            std::string edited;
-            with_restored_io([&] { edited = notes.edit_external(form_title, initial); });
-            const Note saved = editing ? notes.update(editing_id, form_input(edited)) : notes.create(form_input(edited));
+            with_restored_io([&] { edited = notes.edit_external(form_title, editing ? form_content : ""); });
+            const Note saved = editing
+                                   ? notes.update(editing_id, form_input(edited->document.title, edited->document.body))
+                                   : notes.create(form_input(edited->document.title, edited->document.body));
+            notes.complete_external_edit(edited->temporary_file);
             message = editing ? "Nota actualizada." : "Nota creada.";
-            form_content = edited;
+            form_title = saved.title;
+            form_content = saved.content;
             reload();
             current = notes.find_summary_by_id(saved.id);
             view = KnowledgeView::detail;
             content_offset = 0;
         } catch (const std::exception& exception) {
             error = exception.what();
+            if (edited && error.find(edited->temporary_file.string()) == std::string::npos) {
+                error += " Archivo temporal conservado en: " + edited->temporary_file.string();
+            }
         }
     }
 
     void edit_content() {
         if (!current) return;
+        std::optional<EditedNoteDocument> edited;
         try {
-            std::string edited;
             with_restored_io([&] { edited = notes.edit_external(current->note.title, current->note.content); });
-            NoteInput input{current->note.title, current->note.type, edited, current->note.project_id,
+            NoteInput input{edited->document.title, current->note.type, edited->document.body, current->note.project_id,
                             current->note.task_id, current->note.is_favorite};
             notes.update(current->note.id, std::move(input));
+            notes.complete_external_edit(edited->temporary_file);
             current = notes.find_summary_by_id(current->note.id);
             reload();
-            message = "Contenido actualizado.";
+            message = "Nota actualizada.";
             error.clear();
         } catch (const std::exception& exception) {
             error = exception.what();
+            if (edited && error.find(edited->temporary_file.string()) == std::string::npos) {
+                error += " Archivo temporal conservado en: " + edited->temporary_file.string();
+            }
         }
     }
 
@@ -335,7 +345,7 @@ ftxui::Element help_panel() {
                         text("a archivar · u desarchivar · v activas/archivadas · / buscar · r recargar"),
                         text("t tipo · p proyecto/global · g alcance · c limpiar filtros"),
                         text("Detalle: o editor · p proyecto · t tarea · Esc/q volver"), separator(),
-                        text("Ctrl+S abre el editor externo y guarda al cerrarlo correctamente.") | dim,
+                        text("Ctrl+S abre título y cuerpo como un único documento Markdown.") | dim,
                         text("Presioná ?, Esc o q para cerrar") | dim | center})) |
            size(WIDTH, EQUAL, 78);
 }
@@ -453,10 +463,11 @@ ftxui::Component create_knowledge_screen(
                          hbox({text("Proyecto: ") | size(WIDTH, EQUAL, 13), project_dropdown->Render() | flex}),
                          hbox({text("Tarea:    ") | size(WIDTH, EQUAL, 13), task_dropdown->Render() | flex}),
                          favorite_checkbox->Render(), separator(),
-                         text("Ctrl+S abrirá el editor externo para el contenido Markdown.") | dim,
+                         text("El título inicial prepara la plantilla; podés cambiarlo dentro del editor.") | dim,
+                         text("Ctrl+S abrirá título y cuerpo como un único documento Markdown.") | dim,
                          !state->error.empty() ? text("Error: " + state->error) | color(Color::Red) : text(""), filler()}) |
                    border | flex;
-            footer = "Tab cambiar campo  Ctrl+S editar contenido y guardar  Esc cancelar  ? ayuda";
+            footer = "Tab cambiar campo  Ctrl+S editar documento y guardar  Esc cancelar  ? ayuda";
         } else if (state->view == KnowledgeView::archive_confirmation && state->current) {
             body = vbox({filler(), window(text(" CONFIRMAR ARCHIVADO ") | bold | color(Color::Yellow),
                                           vbox({text("Se archivará la nota:") | center,
