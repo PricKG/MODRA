@@ -53,6 +53,7 @@ void run_ui(ProjectService& projects, TaskService& tasks, DashboardService& dash
     bool knowledge_return_to_project = false;
     bool knowledge_return_to_task = false;
     bool knowledge_return_to_work = false;
+    bool knowledge_return_to_dashboard = false;
     int root_tab = 0;
     std::optional<Project> task_project;
     std::optional<Project> requested_project;
@@ -209,7 +210,15 @@ void run_ui(ProjectService& projects, TaskService& tasks, DashboardService& dash
         },
         [&] {
             knowledge_visible = false;
-            if (knowledge_return_to_work) {
+            if (knowledge_return_to_dashboard) {
+                knowledge_return_to_dashboard = false;
+                navigation.selected = 0;
+                navigation.active = 0;
+                navigation.focus = MainFocus::content;
+                root_tab = 5;
+                dashboard_screen->OnEvent(Event::Custom);
+                dashboard_screen->TakeFocus();
+            } else if (knowledge_return_to_work) {
                 knowledge_return_to_work = false;
                 work_visible = true;
                 navigation.selected = 2;
@@ -242,8 +251,31 @@ void run_ui(ProjectService& projects, TaskService& tasks, DashboardService& dash
             }
         },
         [&](const std::function<void()>& action) { screen.WithRestoredIO(action)(); });
-    dashboard_screen = create_dashboard_screen(dashboard);
-    auto root = Container::Tab({menu, project_screen, task_screen, work_screen, knowledge_screen}, &root_tab);
+    auto open_dashboard_knowledge = [&](KnowledgeRequest request) {
+        requested_knowledge = std::move(request);
+        knowledge_return_to_dashboard = true;
+        knowledge_visible = true;
+        navigation.selected = 3;
+        navigation.active = 3;
+        navigation.focus = MainFocus::content;
+        root_tab = 4;
+        knowledge_screen->OnEvent(Event::Custom);
+        knowledge_screen->TakeFocus();
+    };
+    dashboard_screen = create_dashboard_screen(
+        dashboard,
+        [&](std::int64_t note_id) {
+            KnowledgeRequest request;
+            request.note_id = note_id;
+            open_dashboard_knowledge(std::move(request));
+        },
+        [&] {
+            KnowledgeRequest request;
+            request.favorites = true;
+            open_dashboard_knowledge(std::move(request));
+        });
+    auto root = Container::Tab({menu, project_screen, task_screen, work_screen, knowledge_screen, dashboard_screen},
+                               &root_tab);
 
     auto activate_section = [&] {
         projects_visible = navigation.active == 1;
@@ -256,6 +288,7 @@ void run_ui(ProjectService& projects, TaskService& tasks, DashboardService& dash
         knowledge_return_to_project = false;
         knowledge_return_to_task = false;
         knowledge_return_to_work = false;
+        knowledge_return_to_dashboard = false;
         root_tab = 0;
         menu->TakeFocus();
 
@@ -268,7 +301,10 @@ void run_ui(ProjectService& projects, TaskService& tasks, DashboardService& dash
     auto focus_content = [&] {
         if (Terminal::Size().dimx < 52) return;
         navigation.focus = MainFocus::content;
-        if (navigation.active == 1) {
+        if (navigation.active == 0) {
+            root_tab = 5;
+            dashboard_screen->TakeFocus();
+        } else if (navigation.active == 1) {
             projects_visible = true;
             root_tab = 1;
             project_screen->TakeFocus();
@@ -318,7 +354,11 @@ void run_ui(ProjectService& projects, TaskService& tasks, DashboardService& dash
 
         auto footer = navigation.focus == MainFocus::menu
                           ? text(" [↑/↓] Sección  [Tab/→] Contenido  [?] Ayuda  [q] Salir ") | border
-                          : text(" [←/Esc] Menú  [Enter] Abrir  [r] Actualizar  [?] Ayuda  [q] Volver ") | border;
+                          : navigation.active == 0
+                                ? text(" [↑/↓] Favorita  [Enter] Abrir  [r] Actualizar  [←/Esc] Menú  [?] Ayuda ") |
+                                      border
+                                : text(" [←/Esc] Menú  [Enter] Abrir  [r] Actualizar  [?] Ayuda  [q] Volver ") |
+                                      border;
 
         auto base = vbox({header, hbox({sidebar, content}) | flex, footer});
         if (exit_confirmation) {
@@ -370,7 +410,18 @@ void run_ui(ProjectService& projects, TaskService& tasks, DashboardService& dash
             return true;
         }
         if (navigation.focus == MainFocus::content) {
-            if (navigation.active == 0 || navigation.active >= 4) {
+            if (navigation.active == 0) {
+                if (event == Event::Character('?')) {
+                    help_visible = true;
+                } else if (event == Event::Escape || event == Event::ArrowLeft || shortcut(event, 'q')) {
+                    navigation.focus = MainFocus::menu;
+                    root_tab = 0;
+                    menu->TakeFocus();
+                    return true;
+                }
+                return false;
+            }
+            if (navigation.active >= 4) {
                 if (event == Event::Character('?')) {
                     help_visible = true;
                 } else if (event == Event::Escape || event == Event::ArrowLeft || shortcut(event, 'q')) {

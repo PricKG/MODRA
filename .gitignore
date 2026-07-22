@@ -3,3 +3,5 @@
 /.vs/
 *.user
 *.suo
+/MODRA-Setup-*.exe
+/MODRA-Setup-*.exe.sha256

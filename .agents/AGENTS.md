@@ -131,7 +131,7 @@ Debe responder rápidamente:
 - ¿Cuáles son los próximos seguimientos?
 - ¿Qué proyectos están en el radar?
 
-El dashboard es una vista exclusivamente informativa. Sus tarjetas, listados y métricas no son seleccionables y no deben abrir Proyectos, Mi trabajo ni detalles de tareas; el acceso a esas áreas se realiza desde la navegación principal.
+Las tarjetas, métricas y listados de tareas del dashboard son exclusivamente informativos y no deben abrir Proyectos, Mi trabajo ni detalles de tareas; el acceso a esas áreas se realiza desde la navegación principal. El panel **Notas favoritas** es la única excepción: funciona como acceso rápido a una nota o a Conocimiento filtrado por favoritas.
 
 No debe convertirse en un panel de productividad, rendimiento personal o carga de equipo.
 
@@ -207,6 +207,7 @@ No crear una entidad alternativa que vuelva a introducir estas capacidades con o
 - Tipos, estados y prioridades fijos.
 - Fecha de seguimiento o límite y bloqueos simples.
 - Búsqueda, filtros, ordenamiento y archivado.
+- Varias notas pueden ser favoritas de forma independiente; el dashboard muestra como acceso rápido hasta las cinco activas modificadas más recientemente.
 - El archivado de tareas y notas es reversible; restaurar una tarea requiere que su proyecto esté activo.
 - Mi trabajo, dashboard informativo, logs y pruebas.
 

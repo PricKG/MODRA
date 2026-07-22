@@ -72,12 +72,14 @@ NoteSummary read_summary(sqlite3_stmt* statement) {
     summary.project_name = optional_text(statement, 10);
     summary.project_alias = optional_text(statement, 11);
     summary.task_title = optional_text(statement, 12);
+    summary.project_archived = sqlite3_column_type(statement, 13) != SQLITE_NULL;
+    summary.task_archived = sqlite3_column_type(statement, 14) != SQLITE_NULL;
     return summary;
 }
 
 constexpr const char* note_columns =
     "n.id, n.title, n.type, n.content, n.project_id, n.task_id, n.is_favorite, n.created_at, n.updated_at, "
-    "n.archived_at, p.name, p.alias, t.title ";
+    "n.archived_at, p.name, p.alias, t.title, p.archived_at, t.archived_at ";
 
 std::vector<NoteSummary> query_summaries(Database& database,
                                          const std::string& where,

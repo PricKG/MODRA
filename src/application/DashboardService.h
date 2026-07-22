@@ -5,7 +5,9 @@
 #include <string>
 #include <vector>
 
+#include "domain/Note.h"
 #include "domain/Task.h"
+#include "infrastructure/database/NoteRepository.h"
 #include "infrastructure/database/ProjectRepository.h"
 #include "infrastructure/database/TaskRepository.h"
 
@@ -35,6 +37,9 @@ struct DashboardData {
     std::array<std::size_t, 4> task_count_by_priority{};
     std::vector<TaskSummary> upcoming_tasks;
     std::vector<AttentionTask> attention_tasks;
+    std::vector<NoteSummary> favorite_notes;
+    std::size_t favorite_note_count = 0;
+    std::size_t additional_favorite_count = 0;
 };
 
 class DashboardService {
@@ -46,6 +51,7 @@ public:
 private:
     ProjectRepository projects_;
     TaskRepository tasks_;
+    NoteRepository notes_;
 };
 
 }  // namespace modra

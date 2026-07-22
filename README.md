@@ -49,6 +49,33 @@ Desde la raiz del repositorio, luego de compilar:
 
 `modra` abre una estructura permanente con encabezado, menú lateral, panel principal y barra de ayuda. Las flechas cambian la sección y actualizan inmediatamente el panel, sin presionar `Enter`. `Tab` o `→` mueve el foco al contenido; `Esc` vuelve al nivel anterior y, desde la raíz de una sección, devuelve el foco al menú. `j` y `k` no son atajos de MODRA. Los demás atajos alfabéticos aceptan mayúsculas y minúsculas (`n` equivale a `N`). Desde el menú, `q` solicita confirmación y una segunda `q` cierra MODRA.
 
+## Instalador Release para Windows
+
+MODRA genera un único instalador en la raíz del proyecto. No necesita la carpeta `migrations/` al ejecutarse e incluye los runtimes de Visual C++ requeridos.
+
+```powershell
+cmake --preset release-windows
+cmake --build --preset release-windows
+.\packaging\windows\BuildInstaller.ps1
+```
+
+El resultado es:
+
+```text
+MODRA-Setup-0.1.0.exe
+MODRA-Setup-0.1.0.exe.sha256
+```
+
+El instalador utiliza IExpress, incluido en Windows, y no necesita NSIS ni WiX. Instala MODRA por usuario en `%LOCALAPPDATA%\Programs\MODRA`, agrega esa carpeta al `PATH`, crea un acceso en el menú Inicio y registra MODRA en **Aplicaciones instaladas**. No elimina la base ni los datos personales al desinstalar.
+
+Después de instalar, abrí una terminal nueva y ejecutá:
+
+```powershell
+modra --version
+modra doctor
+modra
+```
+
 ## Gestión de proyectos
 
 Seleccioná **Proyectos** con las flechas y el listado aparecerá inmediatamente; usá `Tab` o `→` para mover el foco al contenido. La pantalla permite crear, consultar, editar, buscar y archivar proyectos. Los proyectos archivados se conservan en SQLite y se consultan desde una vista separada; no existe eliminación física.
@@ -148,7 +175,7 @@ Tipos disponibles:
 - `configuration` — Configuración.
 - `reference` — Referencia.
 
-Las favoritas se identifican con `*` y aparecen primero. El listado permite buscar por título, contenido, tipo, proyecto y tarea. Los filtros se alternan por tipo (`t`), proyecto o notas globales (`p`) y alcance (`g`: todas, favoritas, con tarea o sin tarea); `c` limpia todos los filtros.
+Las favoritas se identifican con `*` y aparecen primero. Cada nota conserva su propio valor de favorita: marcar una no modifica las demás y se pueden mantener tantas como sean necesarias. El listado permite buscar por título, contenido, tipo, proyecto y tarea. Los filtros se alternan por tipo (`t`), proyecto o notas globales (`p`) y alcance (`g`: todas, favoritas, con tarea o sin tarea); `c` limpia todos los filtros. El alcance **Favoritas** muestra todas las notas favoritas activas.
 
 Atajos principales:
 
@@ -224,16 +251,20 @@ El intérprete reconoce solamente el formato controlado de MODRA: no es un parse
 
 ## Dashboard
 
-El dashboard es un panel visual, informativo y compacto. Sus cuatro tarjetas superiores muestran proyectos activos, tareas en radar, tareas para hoy y seguimientos atrasados. Sus tarjetas y filas no son seleccionables y no abren otras pantallas.
+El dashboard es un panel visual, informativo y compacto. Sus cuatro tarjetas superiores muestran proyectos activos, tareas en radar, tareas para hoy y seguimientos atrasados. Las tarjetas, métricas y filas de tareas no son seleccionables y no abren otras pantallas.
 
 También incluye:
 
 - Distribución compacta de las tarjetas en radar por estado y prioridad.
 - Los cinco próximos seguimientos, ordenados por fecha y prioridad.
 - Hasta cinco tareas que requieren atención, sin duplicados: atrasadas, bloqueadas o críticas.
+- Hasta cinco notas favoritas activas, ordenadas por última modificación, con tipo, proyecto, tarea y fecha de actualización.
+- Un indicador `+ N favoritas más` cuando existen otras; `Enter` abre la nota seleccionada o Conocimiento filtrado por todas las favoritas.
 - Estados vacíos específicos y un inicio guiado cuando todavía no existen datos.
 
-El contenido se carga al seleccionar Dashboard. El dashboard no captura el teclado: la barra lateral permanece siempre visible y las flechas resaltan una opción y cambian el panel inmediatamente. `Enter` se reserva para elementos del contenido; para abrir Proyectos o Mi trabajo se seleccionan directamente en el menú.
+El contenido se carga al seleccionar Dashboard y se actualiza con `r` o al volver desde Conocimiento. La barra lateral permanece siempre visible. `Tab` o `→` mueve el foco al panel de favoritas; allí las flechas seleccionan una nota y `Enter` abre su detalle. El último renglón abre Conocimiento con el filtro **Favoritas**. `Esc`, `←` o `q` devuelve el foco al menú.
+
+Una nota favorita global se identifica como `Global`. Las notas relacionadas muestran el proyecto y, cuando corresponde, `Tarea: <título>`. Si la tarea o el proyecto están archivados, el dashboard lo indica sin ocultar la nota ni impedir abrirla. Archivar una nota la quita del panel; restaurarla conserva su condición de favorita.
 
 En terminales amplias las tarjetas y gráficos se distribuyen en columnas. En tamaños medianos las tarjetas se organizan en dos filas. En terminales estrechas la barra lateral reduce su ancho pero permanece visible, mientras los paneles se apilan y los títulos largos se recortan. Por debajo de 52 columnas, el panel muestra un aviso para ampliar la terminal y mantiene disponible el menú.
 

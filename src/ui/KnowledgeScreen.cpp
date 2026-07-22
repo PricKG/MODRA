@@ -253,9 +253,9 @@ struct KnowledgeState {
         }
     }
 
-    void sync_request() {
+    bool sync_request() {
         const auto request = requested();
-        if (!request) return;
+        if (!request) return false;
         reload();
         if (request->create) {
             begin_create(request->project_id, request->task_id);
@@ -266,9 +266,10 @@ struct KnowledgeState {
                 showing_archived = current->note.archived_at.has_value();
             }
         } else {
+            showing_archived = false;
             type_filter = 0;
             project_filter = 0;
-            scope_filter = 0;
+            scope_filter = request->favorites ? 1 : 0;
             task_filter.reset();
             search_query.clear();
             if (request->project_id) {
@@ -281,6 +282,7 @@ struct KnowledgeState {
             reload();
             view = KnowledgeView::list;
         }
+        return true;
     }
 
     std::string filters_label() const {
@@ -489,10 +491,12 @@ ftxui::Component create_knowledge_screen(
     });
 
     return CatchEvent(renderer, [=](Event event) {
-        state->sync_request();
+        const bool request_synchronized = state->sync_request();
         if (event == Event::Custom) {
-            state->reload();
-            if (state->current) state->current = state->notes.find_summary_by_id(state->current->note.id);
+            if (!request_synchronized) {
+                state->reload();
+                if (state->current) state->current = state->notes.find_summary_by_id(state->current->note.id);
+            }
             return true;
         }
         if (state->help_visible) {

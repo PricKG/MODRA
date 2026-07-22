@@ -45,6 +45,8 @@ struct NoteSummary {
     std::optional<std::string> project_name;
     std::optional<std::string> project_alias;
     std::optional<std::string> task_title;
+    bool project_archived = false;
+    bool task_archived = false;
 };
 
 std::string_view note_type_name(NoteType type);

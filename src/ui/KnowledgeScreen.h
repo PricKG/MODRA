@@ -17,6 +17,7 @@ struct KnowledgeRequest {
     std::optional<std::int64_t> project_id;
     std::optional<std::int64_t> task_id;
     bool create = false;
+    bool favorites = false;
 };
 
 ftxui::Component create_knowledge_screen(

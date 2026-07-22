@@ -16,6 +16,22 @@
         "CMAKE_CONFIGURATION_TYPES": "Debug",
         "BUILD_TESTING": "ON"
       }
+    },
+    {
+      "name": "release-windows",
+      "displayName": "MODRA Release para Windows",
+      "generator": "Visual Studio 18 2026",
+      "binaryDir": "${sourceDir}/build/release-windows",
+      "architecture": "x64",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "CMAKE_CONFIGURATION_TYPES": "Release",
+        "BUILD_TESTING": "OFF"
+      }
     }
   ],
   "buildPresets": [
@@ -23,6 +39,11 @@
       "name": "debug",
       "configurePreset": "debug",
       "configuration": "Debug"
+    },
+    {
+      "name": "release-windows",
+      "configurePreset": "release-windows",
+      "configuration": "Release"
     }
   ],
   "testPresets": [

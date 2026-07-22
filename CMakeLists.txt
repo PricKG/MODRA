@@ -133,6 +133,7 @@ if(BUILD_TESTING)
     FetchContent_MakeAvailable(Catch2)
 
     add_executable(modra_tests
+        src/ui/DashboardScreen.cpp
         tests/DashboardTests.cpp
         tests/InfrastructureTests.cpp
         tests/GlobalTaskTests.cpp

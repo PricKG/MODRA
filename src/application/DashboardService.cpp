@@ -46,12 +46,18 @@ bool actionable(TaskStatus status) {
 
 }  // namespace
 
-DashboardService::DashboardService(Database& database) : projects_(database), tasks_(database) {}
+DashboardService::DashboardService(Database& database) : projects_(database), tasks_(database), notes_(database) {}
 
 DashboardData DashboardService::load(const std::string& today) const {
     static_cast<void>(parse_date(today));
     DashboardData data;
     data.active_project_count = projects_.list_active().size();
+    data.favorite_notes = notes_.list_favorites();
+    data.favorite_note_count = data.favorite_notes.size();
+    if (data.favorite_notes.size() > 5) {
+        data.favorite_notes.resize(5);
+        data.additional_favorite_count = data.favorite_note_count - data.favorite_notes.size();
+    }
 
     std::vector<TaskSummary> actionable_tasks;
     for (const auto& summary : tasks_.list_all_active()) {

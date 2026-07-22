@@ -2,9 +2,11 @@
 
 #include <algorithm>
 #include <array>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 
 #include <ftxui/component/event.hpp>
 #include <ftxui/dom/elements.hpp>
@@ -13,6 +15,8 @@
 
 #include "application/DashboardService.h"
 #include "application/TaskService.h"
+#include "domain/Note.h"
+#include "ui/KeyEvent.h"
 
 namespace modra {
 namespace {
@@ -28,6 +32,11 @@ std::string shortened(std::string value, std::size_t limit) {
 std::string short_date(const std::optional<std::string>& date) {
     if (!date || date->size() < 10) return "Sin fecha";
     return date->substr(8, 2) + "/" + date->substr(5, 2);
+}
+
+std::string short_timestamp(const std::string& timestamp) {
+    if (timestamp.size() < 10) return timestamp;
+    return timestamp.substr(8, 2) + "/" + timestamp.substr(5, 2) + "/" + timestamp.substr(0, 4);
 }
 
 const char* attention_label(AttentionReason reason) {
@@ -69,7 +78,10 @@ Element distribution_bar(const std::string& label,
 }
 
 struct DashboardState {
-    explicit DashboardState(DashboardService& service_value) : service(service_value) {
+    DashboardState(DashboardService& service_value,
+                   std::function<void(std::int64_t)> open_note,
+                   std::function<void()> open_all_favorites)
+        : service(service_value), on_note(std::move(open_note)), on_all_favorites(std::move(open_all_favorites)) {
         reload();
     }
 
@@ -77,6 +89,9 @@ struct DashboardState {
         try {
             today = TaskService::current_local_date();
             data = service.load(today);
+            favorite_selected = data.favorite_notes.empty()
+                                    ? 0
+                                    : std::clamp(favorite_selected, 0, static_cast<int>(data.favorite_notes.size()));
             error.clear();
         } catch (const std::exception& exception) {
             error = "No se pudo cargar el dashboard. Volvé a ingresar para reintentar.";
@@ -86,15 +101,20 @@ struct DashboardState {
 
     DashboardService& service;
     DashboardData data;
+    std::function<void(std::int64_t)> on_note;
+    std::function<void()> on_all_favorites;
+    int favorite_selected = 0;
     std::string today;
     std::string error;
 };
 
 }  // namespace
 
-ftxui::Component create_dashboard_screen(DashboardService& dashboard) {
+ftxui::Component create_dashboard_screen(DashboardService& dashboard,
+                                         std::function<void(std::int64_t)> on_note,
+                                         std::function<void()> on_all_favorites) {
     using namespace ftxui;
-    auto state = std::make_shared<DashboardState>(dashboard);
+    auto state = std::make_shared<DashboardState>(dashboard, std::move(on_note), std::move(on_all_favorites));
     auto component = Renderer([state] {
         const int terminal_width = Terminal::Size().dimx;
         const bool wide = terminal_width >= 125;
@@ -238,13 +258,70 @@ ftxui::Component create_dashboard_screen(DashboardService& dashboard) {
             body.push_back(window(text(" Requieren atención ") | bold, vbox(std::move(attention_rows))));
         }
 
-        body.push_back(text("Vista informativa") | dim | center);
+        Elements favorite_rows;
+        if (state->data.favorite_notes.empty()) {
+            favorite_rows.push_back(text(medium ? "No hay notas favoritas." : "Sin notas favoritas.") | dim);
+            if (medium) favorite_rows.push_back(text("Marcá una nota con f para verla acá.") | dim);
+        } else {
+            for (std::size_t index = 0; index < state->data.favorite_notes.size(); ++index) {
+                const auto& summary = state->data.favorite_notes[index];
+                const bool selected = state->favorite_selected == static_cast<int>(index);
+                const std::string project = summary.project_name.value_or(summary.project_alias.value_or("Global"));
+                std::string relation = std::string(note_type_label(summary.note.type)) + " · ";
+                if (summary.note.task_id) {
+                    relation += "Proyecto: " + project + " · Tarea: " + summary.task_title.value_or("No disponible");
+                } else if (summary.note.project_id) {
+                    relation += "Proyecto: " + project;
+                } else {
+                    relation += "Global";
+                }
+                if (summary.project_archived) relation += " · Proyecto archivado";
+                if (summary.task_archived) relation += " · Tarea archivada";
+
+                auto title = hbox({text(selected ? "> * " : "  * ") | color(Color::Yellow),
+                                   text(shortened(summary.note.title, wide ? 54 : medium ? 38 : 22)) | bold | flex});
+                auto relation_row = text("    " + shortened(relation, wide ? 100 : medium ? 64 : 26)) | dim;
+                auto updated = text("    Actualizada: " + short_timestamp(summary.note.updated_at)) | dim;
+                favorite_rows.push_back(
+                    (medium ? vbox({hbox({title | flex, updated}), relation_row})
+                            : vbox({title, relation_row, updated})) |
+                    (selected ? color(Color::Cyan) : color(Color::Default)));
+            }
+
+            const bool all_selected = state->favorite_selected == static_cast<int>(state->data.favorite_notes.size());
+            const std::string more = state->data.additional_favorite_count > 0
+                                         ? "+ " + std::to_string(state->data.additional_favorite_count) + " favoritas más"
+                                         : "Ver todas las favoritas";
+            favorite_rows.push_back(text(std::string(all_selected ? "> " : "  ") + more) |
+                                    (all_selected ? color(Color::Cyan) : color(Color::Default)) | bold);
+        }
+        body.push_back(window(text(" Notas favoritas ") | bold, vbox(std::move(favorite_rows))));
+
+        body.push_back(text("Las métricas y tareas son informativas · Tab/→ entra a Notas favoritas") | dim | center);
         return vbox(std::move(body)) | vscroll_indicator | frame | flex;
     });
 
     return CatchEvent(component, [state](Event event) {
         if (event == Event::Custom) {
             state->reload();
+            return true;
+        }
+        if (shortcut(event, 'r')) {
+            state->reload();
+            return true;
+        }
+        if (!state->data.favorite_notes.empty() && (event == Event::ArrowUp || event == Event::ArrowDown)) {
+            const int last = static_cast<int>(state->data.favorite_notes.size());
+            state->favorite_selected = std::clamp(
+                state->favorite_selected + (event == Event::ArrowDown ? 1 : -1), 0, last);
+            return true;
+        }
+        if (!state->data.favorite_notes.empty() && event == Event::Return) {
+            if (state->favorite_selected < static_cast<int>(state->data.favorite_notes.size())) {
+                state->on_note(state->data.favorite_notes[static_cast<std::size_t>(state->favorite_selected)].note.id);
+            } else {
+                state->on_all_favorites();
+            }
             return true;
         }
         return false;
