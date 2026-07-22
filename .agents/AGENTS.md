@@ -306,6 +306,9 @@ El directorio contiene `modra.db`, `config.json`, `backups/`, `exports/` y `logs
 
 Reglas:
 
+- `migrations/*.sql` es la única fuente de verdad del esquema.
+- CMake incorpora las migraciones al ejecutable durante la compilación; MODRA no depende de archivos SQL externos al ejecutarse.
+- No duplicar SQL de migraciones dentro de código C++.
 - No modificar migraciones ya aplicadas.
 - Todo cambio real de esquema requiere una migración nueva y versionada.
 - No crear migraciones para terminología o documentación.
@@ -413,6 +416,7 @@ Durante el trabajo:
 - El núcleo futuro es organización personal, notas y conocimiento.
 - La jerarquía es `Proyecto → Tarea`.
 - Las notas personales se guardan en Markdown dentro de SQLite y pueden ser globales o relacionarse opcionalmente con proyecto y tarea.
+- Las migraciones aplicadas son inmutables, viven únicamente en `migrations/*.sql` y se embeben en el ejecutable durante la compilación.
 - El contenido extenso se modifica mediante un editor externo; no se planifican wiki, colaboración, versionado ni adjuntos en esta etapa.
 - No existe el concepto funcional de módulos.
 - El responsable es texto opcional y no existe catálogo obligatorio de personas.

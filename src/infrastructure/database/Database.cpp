@@ -7,6 +7,7 @@
 #include <spdlog/spdlog.h>
 
 #include "application/AppInfo.h"
+#include "modra/EmbeddedMigrations.h"
 
 namespace modra {
 
@@ -61,139 +62,81 @@ int Database::scalar_int(const char* sql) const {
 }
 
 void Database::apply_migrations() {
+    const auto migrations = embedded_migrations();
+    if (migrations.empty() || migrations.front().version != 1) {
+        throw std::runtime_error("Embedded migrations must start with version 1");
+    }
+
     execute("BEGIN IMMEDIATE;");
     try {
-        execute(
-            "CREATE TABLE IF NOT EXISTS schema_migrations ("
-            "version INTEGER PRIMARY KEY,"
-            "name TEXT NOT NULL,"
-            "applied_at TEXT NOT NULL"
-            ");");
+        bool migration_table_exists =
+            scalar_int("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations';") != 0;
 
-        if (scalar_int("SELECT COUNT(*) FROM schema_migrations WHERE version = 1;") == 0) {
-            spdlog::info("Applying migration 1: initial_schema");
-            execute(
-                "CREATE TABLE IF NOT EXISTS app_metadata ("
-                "key TEXT PRIMARY KEY,"
-                "value TEXT NOT NULL"
-                ");");
+        for (const auto& migration : migrations) {
+            bool applied = false;
+            if (migration_table_exists) {
+                sqlite3_stmt* statement = nullptr;
+                const char* applied_sql = "SELECT COUNT(*) FROM schema_migrations WHERE version = ?1;";
+                if (sqlite3_prepare_v2(connection_, applied_sql, -1, &statement, nullptr) != SQLITE_OK) {
+                    throw std::runtime_error("Could not prepare migration lookup: " +
+                                             std::string(sqlite3_errmsg(connection_)));
+                }
+                sqlite3_bind_int(statement, 1, migration.version);
+                const int step = sqlite3_step(statement);
+                if (step != SQLITE_ROW) {
+                    const std::string message = sqlite3_errmsg(connection_);
+                    sqlite3_finalize(statement);
+                    throw std::runtime_error("Could not read migration state: " + message);
+                }
+                applied = sqlite3_column_int(statement, 0) != 0;
+                sqlite3_finalize(statement);
+            }
+            if (applied) continue;
+
+            spdlog::info("Applying migration {}: {}", migration.version, migration.name);
+            const std::string sql(migration.sql);
+            execute(sql.c_str());
+            migration_table_exists = true;
+
+            if (migration.version == 1) {
+                sqlite3_stmt* statement = nullptr;
+                const char* metadata_sql =
+                    "INSERT OR REPLACE INTO app_metadata(key, value) VALUES('application_version', ?1);";
+                if (sqlite3_prepare_v2(connection_, metadata_sql, -1, &statement, nullptr) != SQLITE_OK) {
+                    throw std::runtime_error("Could not prepare application metadata: " +
+                                             std::string(sqlite3_errmsg(connection_)));
+                }
+                const std::string version(application_version());
+                sqlite3_bind_text(statement, 1, version.c_str(), -1, SQLITE_TRANSIENT);
+                if (sqlite3_step(statement) != SQLITE_DONE) {
+                    const std::string message = sqlite3_errmsg(connection_);
+                    sqlite3_finalize(statement);
+                    throw std::runtime_error("Could not store application metadata: " + message);
+                }
+                sqlite3_finalize(statement);
+                execute(
+                    "INSERT INTO app_metadata(key, value) "
+                    "VALUES('initialized_at', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));"
+                );
+            }
 
             sqlite3_stmt* statement = nullptr;
-            const char* metadata_sql =
-                "INSERT OR REPLACE INTO app_metadata(key, value) VALUES('application_version', ?1);";
-            if (sqlite3_prepare_v2(connection_, metadata_sql, -1, &statement, nullptr) != SQLITE_OK) {
-                throw std::runtime_error("Could not prepare application metadata: " +
+            const char* register_sql =
+                "INSERT INTO schema_migrations(version, name, applied_at) "
+                "VALUES(?1, ?2, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));";
+            if (sqlite3_prepare_v2(connection_, register_sql, -1, &statement, nullptr) != SQLITE_OK) {
+                throw std::runtime_error("Could not prepare migration registration: " +
                                          std::string(sqlite3_errmsg(connection_)));
             }
-            const std::string version(application_version());
-            sqlite3_bind_text(statement, 1, version.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_int(statement, 1, migration.version);
+            sqlite3_bind_text(statement, 2, migration.name.data(), static_cast<int>(migration.name.size()),
+                              SQLITE_TRANSIENT);
             if (sqlite3_step(statement) != SQLITE_DONE) {
                 const std::string message = sqlite3_errmsg(connection_);
                 sqlite3_finalize(statement);
-                throw std::runtime_error("Could not store application metadata: " + message);
+                throw std::runtime_error("Could not register migration: " + message);
             }
             sqlite3_finalize(statement);
-
-            execute(
-                "INSERT INTO app_metadata(key, value) "
-                "VALUES('initialized_at', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));"
-                "INSERT INTO schema_migrations(version, name, applied_at) "
-                "VALUES(1, 'initial_schema', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));"
-            );
-        }
-
-        if (scalar_int("SELECT COUNT(*) FROM schema_migrations WHERE version = 2;") == 0) {
-            spdlog::info("Applying migration 2: projects");
-            execute(
-                "CREATE TABLE projects ("
-                "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                "name TEXT NOT NULL CHECK(length(trim(name)) > 0),"
-                "alias TEXT NOT NULL UNIQUE CHECK(length(alias) > 0),"
-                "description TEXT,"
-                "status TEXT NOT NULL DEFAULT 'planned' "
-                "CHECK(status IN ('planned', 'active', 'paused', 'completed', 'archived')),"
-                "start_date TEXT,"
-                "target_date TEXT,"
-                "local_path TEXT,"
-                "created_at TEXT NOT NULL,"
-                "updated_at TEXT NOT NULL,"
-                "archived_at TEXT"
-                ");"
-                "CREATE INDEX idx_projects_status ON projects(status);"
-                "CREATE INDEX idx_projects_archived_at ON projects(archived_at);"
-                "INSERT INTO schema_migrations(version, name, applied_at) "
-                "VALUES(2, 'projects', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));"
-            );
-        }
-
-        if (scalar_int("SELECT COUNT(*) FROM schema_migrations WHERE version = 3;") == 0) {
-            spdlog::info("Applying migration 3: tasks");
-            execute(
-                "CREATE TABLE tasks ("
-                "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                "project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE RESTRICT,"
-                "title TEXT NOT NULL CHECK(length(trim(title)) > 0),"
-                "description TEXT,"
-                "type TEXT NOT NULL DEFAULT 'technical' "
-                "CHECK(type IN ('technical', 'administrative', 'management', 'research', 'documentation', "
-                "'follow_up')),"
-                "status TEXT NOT NULL DEFAULT 'pending' "
-                "CHECK(status IN ('pending', 'in_progress', 'blocked', 'in_review', 'completed', 'cancelled')),"
-                "priority TEXT NOT NULL DEFAULT 'normal' "
-                "CHECK(priority IN ('low', 'normal', 'high', 'critical')),"
-                "due_date TEXT,"
-                "completed_at TEXT,"
-                "blocked_reason TEXT,"
-                "created_at TEXT NOT NULL,"
-                "updated_at TEXT NOT NULL,"
-                "archived_at TEXT,"
-                "CHECK(status <> 'blocked' OR (blocked_reason IS NOT NULL AND length(trim(blocked_reason)) > 0)),"
-                "CHECK(status <> 'completed' OR completed_at IS NOT NULL)"
-                ");"
-                "CREATE INDEX idx_tasks_project_id ON tasks(project_id);"
-                "CREATE INDEX idx_tasks_status ON tasks(status);"
-                "CREATE INDEX idx_tasks_due_date ON tasks(due_date);"
-                "CREATE INDEX idx_tasks_archived_at ON tasks(archived_at);"
-                "INSERT INTO schema_migrations(version, name, applied_at) "
-                "VALUES(3, 'tasks', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));"
-            );
-        }
-
-        if (scalar_int("SELECT COUNT(*) FROM schema_migrations WHERE version = 4;") == 0) {
-            spdlog::info("Applying migration 4: task_assignee_name");
-            execute(
-                "ALTER TABLE tasks ADD COLUMN assignee_name TEXT "
-                "CHECK(assignee_name IS NULL OR length(trim(assignee_name)) > 0);"
-                "INSERT INTO schema_migrations(version, name, applied_at) "
-                "VALUES(4, 'task_assignee_name', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));"
-            );
-        }
-        if (scalar_int("SELECT COUNT(*) FROM schema_migrations WHERE version = 5;") == 0) {
-            spdlog::info("Applying migration 5: notes");
-            execute(
-                "CREATE TABLE notes ("
-                "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                "title TEXT NOT NULL CHECK(length(trim(title)) > 0),"
-                "type TEXT NOT NULL DEFAULT 'general' "
-                "CHECK(type IN ('general', 'technical', 'solution', 'meeting', 'sql', 'procedure', "
-                "'configuration', 'reference')),"
-                "content TEXT NOT NULL CHECK(length(trim(content)) > 0),"
-                "project_id INTEGER REFERENCES projects(id) ON DELETE RESTRICT,"
-                "task_id INTEGER REFERENCES tasks(id) ON DELETE RESTRICT,"
-                "is_favorite INTEGER NOT NULL DEFAULT 0 CHECK(is_favorite IN (0, 1)),"
-                "created_at TEXT NOT NULL,"
-                "updated_at TEXT NOT NULL,"
-                "archived_at TEXT"
-                ");"
-                "CREATE INDEX idx_notes_type ON notes(type);"
-                "CREATE INDEX idx_notes_project_id ON notes(project_id);"
-                "CREATE INDEX idx_notes_task_id ON notes(task_id);"
-                "CREATE INDEX idx_notes_is_favorite ON notes(is_favorite);"
-                "CREATE INDEX idx_notes_updated_at ON notes(updated_at);"
-                "CREATE INDEX idx_notes_archived_at ON notes(archived_at);"
-                "INSERT INTO schema_migrations(version, name, applied_at) "
-                "VALUES(5, 'notes', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));"
-            );
         }
         execute("COMMIT;");
     } catch (...) {

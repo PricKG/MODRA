@@ -56,7 +56,19 @@ target_compile_definitions(modra_sqlite PRIVATE SQLITE_THREADSAFE=1)
 
 configure_file(cmake/Version.h.in generated/modra/Version.h @ONLY)
 
+include(cmake/GenerateMigrations.cmake)
+set(MODRA_GENERATED_MIGRATIONS_HEADER
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/modra/EmbeddedMigrations.h")
+set(MODRA_GENERATED_MIGRATIONS_SOURCE
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/modra/EmbeddedMigrations.cpp")
+modra_generate_embedded_migrations(
+    "${CMAKE_CURRENT_SOURCE_DIR}/migrations"
+    "${MODRA_GENERATED_MIGRATIONS_HEADER}"
+    "${MODRA_GENERATED_MIGRATIONS_SOURCE}"
+)
+
 add_library(modra_core
+    "${MODRA_GENERATED_MIGRATIONS_SOURCE}"
     src/application/AppInfo.cpp
     src/application/DashboardService.cpp
     src/application/NoteService.cpp
@@ -138,4 +150,13 @@ if(BUILD_TESTING)
     list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
     include(Catch)
     catch_discover_tests(modra_tests)
+
+    set(MODRA_STANDALONE_TEST_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/standalone-runtime")
+    file(MAKE_DIRECTORY "${MODRA_STANDALONE_TEST_DIRECTORY}")
+    add_test(NAME "MODRA executable runs without external migrations"
+             COMMAND modra doctor)
+    set_tests_properties("MODRA executable runs without external migrations" PROPERTIES
+        WORKING_DIRECTORY "${MODRA_STANDALONE_TEST_DIRECTORY}"
+        ENVIRONMENT "LOCALAPPDATA=${MODRA_STANDALONE_TEST_DIRECTORY}/data"
+    )
 endif()

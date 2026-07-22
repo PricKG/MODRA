@@ -233,6 +233,12 @@ No forman parte del roadmap el historial detallado de tareas, comentarios encade
 
 El directorio contiene `modra.db`, `config.json`, `backups/`, `exports/` y `logs/`. El log principal se escribe en `logs/modra.log`.
 
+## Migraciones de base de datos
+
+Los archivos versionados de [`migrations/`](migrations/) son la única fuente de verdad del esquema. Durante la configuración, CMake valida sus nombres, los ordena por versión y genera código C++ dentro de `build/` con el SQL embebido. Por eso el ejecutable no necesita encontrar la carpeta `migrations/` en tiempo de ejecución.
+
+Una migración futura debe agregarse como un nuevo archivo `NNN_nombre.sql`, con una versión no utilizada y un nombre claro. Una migración que ya fue aplicada es inmutable: cualquier modificación posterior del esquema requiere otro archivo versionado; el SQL no debe copiarse en `Database.cpp` ni en otro código C++.
+
 ## Estructura
 
 - `cmake/`: cabeceras configuradas por CMake.
