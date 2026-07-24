@@ -85,6 +85,10 @@ bool completed_recently(const Task& task, const std::string& first_day, const st
     return completion_date >= first_day && completion_date <= today;
 }
 
+bool actionable(TaskStatus status) {
+    return status != TaskStatus::completed && status != TaskStatus::cancelled;
+}
+
 int priority_rank(TaskPriority priority) {
     switch (priority) {
         case TaskPriority::critical: return 0;
@@ -184,14 +188,14 @@ std::vector<TaskSummary> TaskService::list_global(const TaskQuery& query, const 
         switch (query.view) {
             case TaskQuickView::all: matches_view = true; break;
             case TaskQuickView::today:
-                matches_view = task.due_date && *task.due_date == today && task.status != TaskStatus::completed;
+                matches_view = task.due_date && *task.due_date == today && actionable(task.status);
                 break;
             case TaskQuickView::overdue:
-                matches_view = task.due_date && *task.due_date < today && task.status != TaskStatus::completed;
+                matches_view = task.due_date && *task.due_date < today && actionable(task.status);
                 break;
             case TaskQuickView::upcoming:
                 matches_view = task.due_date && *task.due_date > today && *task.due_date <= next_week &&
-                               task.status != TaskStatus::completed;
+                               actionable(task.status);
                 break;
             case TaskQuickView::blocked: matches_view = task.status == TaskStatus::blocked; break;
             case TaskQuickView::recently_completed:
@@ -241,8 +245,8 @@ std::vector<TaskSummary> TaskService::list_global(const TaskQuery& query, const 
                        std::pair{normalized_responsible(b.assignee_name.value_or("zzzz")), due_value(b)};
             case TaskSort::updated_at: return a.updated_at > b.updated_at;
             case TaskSort::recommended: {
-                const bool a_overdue = a.due_date && *a.due_date < today && a.status != TaskStatus::completed;
-                const bool b_overdue = b.due_date && *b.due_date < today && b.status != TaskStatus::completed;
+                const bool a_overdue = a.due_date && *a.due_date < today && actionable(a.status);
+                const bool b_overdue = b.due_date && *b.due_date < today && actionable(b.status);
                 if (a_overdue != b_overdue) return a_overdue;
                 if (priority_rank(a.priority) != priority_rank(b.priority))
                     return priority_rank(a.priority) < priority_rank(b.priority);

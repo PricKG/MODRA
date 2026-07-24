@@ -144,6 +144,31 @@ TEST_CASE("Upcoming view includes the next seven days and excludes today and ove
     CHECK(tasks.front().task.title == "Upcoming");
 }
 
+TEST_CASE("Date-based global views exclude cancelled tasks") {
+    GlobalTaskFixture fixture;
+    fixture.create(fixture.alpha, "Today", fixture.today);
+    fixture.create(fixture.alpha, "Cancelled today", fixture.today, std::nullopt,
+                   modra::TaskStatus::cancelled);
+    fixture.create(fixture.alpha, "Overdue", "2026-07-20");
+    fixture.create(fixture.alpha, "Cancelled overdue", "2026-07-20", std::nullopt,
+                   modra::TaskStatus::cancelled);
+    fixture.create(fixture.alpha, "Upcoming", "2026-07-29");
+    fixture.create(fixture.alpha, "Cancelled upcoming", "2026-07-29", std::nullopt,
+                   modra::TaskStatus::cancelled);
+
+    auto tasks = fixture.tasks.list_global(GlobalTaskFixture::query(modra::TaskQuickView::today), fixture.today);
+    REQUIRE(tasks.size() == 1);
+    CHECK(tasks.front().task.title == "Today");
+
+    tasks = fixture.tasks.list_global(GlobalTaskFixture::query(modra::TaskQuickView::overdue), fixture.today);
+    REQUIRE(tasks.size() == 1);
+    CHECK(tasks.front().task.title == "Overdue");
+
+    tasks = fixture.tasks.list_global(GlobalTaskFixture::query(modra::TaskQuickView::upcoming), fixture.today);
+    REQUIRE(tasks.size() == 1);
+    CHECK(tasks.front().task.title == "Upcoming");
+}
+
 TEST_CASE("Blocked view only returns blocked tasks") {
     GlobalTaskFixture fixture;
     fixture.create(fixture.alpha, "Blocked", std::nullopt, "Ana", modra::TaskStatus::blocked);
@@ -285,12 +310,14 @@ TEST_CASE("Global task ordering supports recommended priority project and respon
     GlobalTaskFixture fixture;
     fixture.create(fixture.beta, "Critical future", "2026-07-25", "Bruno", modra::TaskStatus::pending,
                    modra::TaskPriority::critical);
+    fixture.create(fixture.alpha, "Cancelled overdue critical", "2026-07-19", "Carla",
+                   modra::TaskStatus::cancelled, modra::TaskPriority::critical);
     fixture.create(fixture.alpha, "Overdue low", "2026-07-20", "Ana", modra::TaskStatus::pending,
                    modra::TaskPriority::low);
 
     auto query = GlobalTaskFixture::query();
     auto tasks = fixture.tasks.list_global(query, fixture.today);
-    REQUIRE(tasks.size() == 2);
+    REQUIRE(tasks.size() == 3);
     CHECK(tasks.front().task.title == "Overdue low");
 
     query.sort = modra::TaskSort::project;

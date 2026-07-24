@@ -1,6 +1,7 @@
 #include "infrastructure/system/ExternalEditor.h"
 
 #include <chrono>
+#include <cerrno>
 #include <cstdlib>
 #include <fstream>
 #include <iterator>
@@ -17,6 +18,7 @@
 #include <process.h>
 #else
 #include <sys/wait.h>
+#include <fcntl.h>
 #include <unistd.h>
 #endif
 
@@ -43,15 +45,39 @@ int run_process(const std::vector<std::string>& arguments) {
     if (result == -1) throw std::runtime_error("No se pudo iniciar el editor externo.");
     return static_cast<int>(result);
 #else
+    int startup_pipe[2]{-1, -1};
+    if (pipe(startup_pipe) != 0) throw std::runtime_error("No se pudo iniciar el editor externo.");
+    if (fcntl(startup_pipe[1], F_SETFD, FD_CLOEXEC) != 0) {
+        close(startup_pipe[0]);
+        close(startup_pipe[1]);
+        throw std::runtime_error("No se pudo iniciar el editor externo.");
+    }
     const pid_t child = fork();
-    if (child < 0) throw std::runtime_error("No se pudo iniciar el editor externo.");
+    if (child < 0) {
+        close(startup_pipe[0]);
+        close(startup_pipe[1]);
+        throw std::runtime_error("No se pudo iniciar el editor externo.");
+    }
     if (child == 0) {
+        close(startup_pipe[0]);
         std::vector<char*> argv;
         argv.reserve(arguments.size() + 1);
         for (const auto& argument : arguments) argv.push_back(const_cast<char*>(argument.c_str()));
         argv.push_back(nullptr);
         execvp(argv.front(), argv.data());
+        const int error = errno;
+        static_cast<void>(write(startup_pipe[1], &error, sizeof(error)));
+        close(startup_pipe[1]);
         _exit(127);
+    }
+    close(startup_pipe[1]);
+    int startup_error = 0;
+    const ssize_t startup_read = read(startup_pipe[0], &startup_error, sizeof(startup_error));
+    close(startup_pipe[0]);
+    if (startup_read > 0) {
+        int ignored_status = 0;
+        static_cast<void>(waitpid(child, &ignored_status, 0));
+        throw std::runtime_error("No se pudo iniciar el editor externo.");
     }
     int status = 0;
     if (waitpid(child, &status, 0) < 0) throw std::runtime_error("No se pudo esperar al editor externo.");
