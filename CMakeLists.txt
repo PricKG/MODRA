@@ -98,6 +98,7 @@ target_link_libraries(modra_core
 add_executable(modra
     src/main.cpp
     src/ui/App.cpp
+    src/ui/ConfigurationScreen.cpp
     src/ui/DashboardScreen.cpp
     src/ui/KnowledgeScreen.cpp
     src/ui/ProjectScreen.cpp
@@ -134,6 +135,8 @@ if(BUILD_TESTING)
 
     add_executable(modra_tests
         src/ui/DashboardScreen.cpp
+        src/ui/ConfigurationScreen.cpp
+        tests/ConfigurationScreenTests.cpp
         tests/DashboardTests.cpp
         tests/InfrastructureTests.cpp
         tests/GlobalTaskTests.cpp

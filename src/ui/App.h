@@ -1,5 +1,9 @@
 #pragma once
 
+#include <string>
+
+#include "infrastructure/config/DataDirectory.h"
+
 namespace modra {
 
 class ProjectService;
@@ -20,8 +24,21 @@ struct MainNavigationState {
         active = selected;
         return selected != previous_selection;
     }
+
+    void enter_content() {
+        focus = MainFocus::content;
+    }
+
+    void return_to_menu() {
+        focus = MainFocus::menu;
+    }
 };
 
-void run_ui(ProjectService& projects, TaskService& tasks, DashboardService& dashboard, NoteService& notes);
+void run_ui(ProjectService& projects,
+            TaskService& tasks,
+            DashboardService& dashboard,
+            NoteService& notes,
+            DataPaths paths,
+            std::string sqlite_version);
 
 }  // namespace modra

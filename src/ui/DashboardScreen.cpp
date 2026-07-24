@@ -39,6 +39,46 @@ std::string short_timestamp(const std::string& timestamp) {
     return timestamp.substr(8, 2) + "/" + timestamp.substr(5, 2) + "/" + timestamp.substr(0, 4);
 }
 
+std::string note_excerpt(const std::string& content, std::size_t limit) {
+    std::string result;
+    result.reserve(std::min(content.size(), limit));
+    bool pending_space = false;
+    bool line_start = true;
+    bool skipping_heading = false;
+    for (char character : content) {
+        if (skipping_heading) {
+            if (character == '\r' || character == '\n') {
+                skipping_heading = false;
+                line_start = true;
+            }
+            continue;
+        }
+        if (line_start && character == '#') {
+            skipping_heading = true;
+            continue;
+        }
+        if (line_start && (character == '-' || character == '*' || character == '>')) {
+            pending_space = !result.empty();
+            continue;
+        }
+        if (character == '\r' || character == '\n' || character == '\t' || character == ' ') {
+            pending_space = !result.empty();
+            line_start = character == '\r' || character == '\n';
+            continue;
+        }
+        if (pending_space) {
+            result.push_back(' ');
+            pending_space = false;
+        }
+        result.push_back(character);
+        line_start = false;
+        if (result.size() >= limit) {
+            return shortened(result, limit);
+        }
+    }
+    return result.empty() ? "Sin contenido visible." : result;
+}
+
 const char* attention_label(AttentionReason reason) {
     switch (reason) {
         case AttentionReason::overdue: return "ATRASADA";
@@ -277,14 +317,16 @@ ftxui::Component create_dashboard_screen(DashboardService& dashboard,
                 }
                 if (summary.project_archived) relation += " · Proyecto archivado";
                 if (summary.task_archived) relation += " · Tarea archivada";
+                const std::string excerpt = note_excerpt(summary.note.content, wide ? 110 : medium ? 72 : 32);
 
                 auto title = hbox({text(selected ? "> * " : "  * ") | color(Color::Yellow),
                                    text(shortened(summary.note.title, wide ? 54 : medium ? 38 : 22)) | bold | flex});
                 auto relation_row = text("    " + shortened(relation, wide ? 100 : medium ? 64 : 26)) | dim;
+                auto excerpt_row = text("    " + excerpt);
                 auto updated = text("    Actualizada: " + short_timestamp(summary.note.updated_at)) | dim;
                 favorite_rows.push_back(
-                    (medium ? vbox({hbox({title | flex, updated}), relation_row})
-                            : vbox({title, relation_row, updated})) |
+                    (medium ? vbox({hbox({title | flex, updated}), excerpt_row, relation_row})
+                            : vbox({title, excerpt_row, relation_row, updated})) |
                     (selected ? color(Color::Cyan) : color(Color::Default)));
             }
 

@@ -73,6 +73,15 @@ TEST_CASE("An active content panel blocks main menu navigation") {
     CHECK(navigation.active == 0);
 }
 
+TEST_CASE("Main navigation can enter content and return to the menu") {
+    modra::MainNavigationState navigation;
+    navigation.enter_content();
+    CHECK(navigation.focus == modra::MainFocus::content);
+
+    navigation.return_to_menu();
+    CHECK(navigation.focus == modra::MainFocus::menu);
+}
+
 TEST_CASE("A shortcut does not match a different letter") {
     CHECK_FALSE(modra::shortcut(ftxui::Event::Character('x'), 'n'));
     CHECK_FALSE(modra::shortcut(ftxui::Event::Character('X'), 'n'));

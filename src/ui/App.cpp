@@ -17,6 +17,7 @@
 #include "application/ProjectService.h"
 #include "application/TaskService.h"
 #include "domain/Project.h"
+#include "ui/ConfigurationScreen.h"
 #include "ui/DashboardScreen.h"
 #include "ui/KnowledgeScreen.h"
 #include "ui/KeyEvent.h"
@@ -26,7 +27,12 @@
 
 namespace modra {
 
-void run_ui(ProjectService& projects, TaskService& tasks, DashboardService& dashboard, NoteService& notes) {
+void run_ui(ProjectService& projects,
+            TaskService& tasks,
+            DashboardService& dashboard,
+            NoteService& notes,
+            DataPaths paths,
+            std::string sqlite_version) {
     using namespace ftxui;
 
     const std::vector<std::string> sections{
@@ -37,7 +43,7 @@ void run_ui(ProjectService& projects, TaskService& tasks, DashboardService& dash
         "Tarjetas personales, revisiones, bloqueos y próximos seguimientos.",
         "Notas personales, soluciones y conocimiento reutilizable.",
         "Vista provisional de herramientas locales.",
-        "Vista provisional de configuración.",
+        "Rutas locales, editor externo y entorno detectado.",
     };
 
     MainNavigationState navigation;
@@ -66,6 +72,8 @@ void run_ui(ProjectService& projects, TaskService& tasks, DashboardService& dash
     ftxui::Component work_screen;
     ftxui::Component dashboard_screen;
     ftxui::Component knowledge_screen;
+    ftxui::Component configuration_screen =
+        create_configuration_screen(std::move(paths), std::move(sqlite_version));
     auto project_screen = create_project_screen(
         projects,
         notes,
@@ -274,8 +282,9 @@ void run_ui(ProjectService& projects, TaskService& tasks, DashboardService& dash
             request.favorites = true;
             open_dashboard_knowledge(std::move(request));
         });
-    auto root = Container::Tab({menu, project_screen, task_screen, work_screen, knowledge_screen, dashboard_screen},
-                               &root_tab);
+    auto root = Container::Tab(
+        {menu, project_screen, task_screen, work_screen, knowledge_screen, dashboard_screen, configuration_screen},
+        &root_tab);
 
     auto activate_section = [&] {
         projects_visible = navigation.active == 1;
@@ -296,11 +305,12 @@ void run_ui(ProjectService& projects, TaskService& tasks, DashboardService& dash
         else if (navigation.active == 1) project_screen->OnEvent(Event::Custom);
         else if (navigation.active == 2) work_screen->OnEvent(Event::Custom);
         else if (navigation.active == 3) knowledge_screen->OnEvent(Event::Custom);
+        else if (navigation.active == 5) configuration_screen->OnEvent(Event::Custom);
     };
 
     auto focus_content = [&] {
         if (Terminal::Size().dimx < 52) return;
-        navigation.focus = MainFocus::content;
+        navigation.enter_content();
         if (navigation.active == 0) {
             root_tab = 5;
             dashboard_screen->TakeFocus();
@@ -316,6 +326,11 @@ void run_ui(ProjectService& projects, TaskService& tasks, DashboardService& dash
             knowledge_visible = true;
             root_tab = 4;
             knowledge_screen->TakeFocus();
+        } else if (navigation.active == 5) {
+            root_tab = 6;
+            configuration_screen->TakeFocus();
+        } else {
+            root_tab = 0;
         }
     };
 
@@ -343,6 +358,8 @@ void run_ui(ProjectService& projects, TaskService& tasks, DashboardService& dash
             content = knowledge_screen->Render() | flex;
         } else if (navigation.active == 0) {
             content = dashboard_screen->Render() | flex | border;
+        } else if (navigation.active == 5) {
+            content = configuration_screen->Render() | flex | border;
         } else {
             content = vbox({text(" " + sections[static_cast<std::size_t>(navigation.active)]) | bold |
                                  color(Color::Cyan),
@@ -353,9 +370,12 @@ void run_ui(ProjectService& projects, TaskService& tasks, DashboardService& dash
         }
 
         auto footer = navigation.focus == MainFocus::menu
-                          ? text(" [↑/↓] Sección  [Tab/→] Contenido  [?] Ayuda  [q] Salir ") | border
+                          ? text(" [↑/↓] Sección  [Enter/Tab/→] Entrar  [?] Ayuda  [q] Salir ") | border
                           : navigation.active == 0
                                 ? text(" [↑/↓] Favorita  [Enter] Abrir  [r] Actualizar  [←/Esc] Menú  [?] Ayuda ") |
+                                      border
+                            : navigation.active == 5
+                                ? text(" [Ctrl+S] Guardar editor  [Ctrl+R] Refrescar  [←/Esc] Menú  [?] Ayuda ") |
                                       border
                                 : text(" [←/Esc] Menú  [Enter] Abrir  [r] Actualizar  [?] Ayuda  [q] Volver ") |
                                       border;
@@ -382,8 +402,8 @@ void run_ui(ProjectService& projects, TaskService& tasks, DashboardService& dash
                               text("Teclas disponibles") | bold,
                               hbox({text("↑") | bold | size(WIDTH, EQUAL, 14), text("Selección anterior")}),
                               hbox({text("↓") | bold | size(WIDTH, EQUAL, 14), text("Selección siguiente")}),
-                              hbox({text("Tab / →") | bold | size(WIDTH, EQUAL, 14), text("Mover foco al contenido")}),
-                              hbox({text("Enter") | bold | size(WIDTH, EQUAL, 14), text("Abrir dentro del contenido")}),
+                              hbox({text("Enter") | bold | size(WIDTH, EQUAL, 14), text("Entrar en la sección")}),
+                              hbox({text("Tab / →") | bold | size(WIDTH, EQUAL, 14), text("Entrar en la sección")}),
                               hbox({text("?") | bold | size(WIDTH, EQUAL, 14), text("Abrir o cerrar esta ayuda")}),
                               hbox({text("Esc") | bold | size(WIDTH, EQUAL, 14), text("Retroceder o cerrar ayuda")}),
                               hbox({text("q") | bold | size(WIDTH, EQUAL, 14),
@@ -414,7 +434,7 @@ void run_ui(ProjectService& projects, TaskService& tasks, DashboardService& dash
                 if (event == Event::Character('?')) {
                     help_visible = true;
                 } else if (event == Event::Escape || event == Event::ArrowLeft || shortcut(event, 'q')) {
-                    navigation.focus = MainFocus::menu;
+                    navigation.return_to_menu();
                     root_tab = 0;
                     menu->TakeFocus();
                     return true;
@@ -425,9 +445,11 @@ void run_ui(ProjectService& projects, TaskService& tasks, DashboardService& dash
                 if (event == Event::Character('?')) {
                     help_visible = true;
                 } else if (event == Event::Escape || event == Event::ArrowLeft || shortcut(event, 'q')) {
-                    navigation.focus = MainFocus::menu;
+                    navigation.return_to_menu();
                     root_tab = 0;
                     menu->TakeFocus();
+                } else if (navigation.active == 5) {
+                    return configuration_screen->OnEvent(event);
                 }
                 return true;
             }
@@ -450,7 +472,7 @@ void run_ui(ProjectService& projects, TaskService& tasks, DashboardService& dash
             if (navigation.activate_selected(previous_selection)) activate_section();
             return true;
         }
-        if (event == Event::Tab || event == Event::ArrowRight) {
+        if (event == Event::Return || event == Event::Tab || event == Event::ArrowRight) {
             focus_content();
             return true;
         }

@@ -8,6 +8,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <ftxui/component/event.hpp>
+#include <ftxui/component/screen_interactive.hpp>
 #include <sqlite3.h>
 
 #include "application/DashboardService.h"
@@ -296,6 +297,22 @@ TEST_CASE("Dashboard opens a favorite note and the complete favorites view") {
     CHECK(screen->OnEvent(ftxui::Event::ArrowDown));
     CHECK(screen->OnEvent(ftxui::Event::Return));
     CHECK(opened_all);
+}
+
+TEST_CASE("Dashboard renders favorite note content excerpts") {
+    DashboardFixture fixture;
+    const auto note = fixture.create_note("Procedimiento");
+    modra::NoteInput input{note.title, note.type,
+                           "# Procedimiento\n\nRevisar release, checksum y enlace público antes de publicar."};
+    input.is_favorite = true;
+    fixture.notes.update(note.id, input);
+
+    auto screen = modra::create_dashboard_screen(fixture.dashboard, [](std::int64_t) {}, [] {});
+    auto rendered = screen->Render();
+    auto output = ftxui::Screen::Create(ftxui::Dimension::Fixed(120), ftxui::Dimension::Fixed(80));
+    Render(output, rendered);
+
+    CHECK(output.ToString().find("Revisar release") != std::string::npos);
 }
 
 TEST_CASE("Multiple favorite notes remain independent after reopening SQLite") {

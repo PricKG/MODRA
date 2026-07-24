@@ -80,7 +80,7 @@ int main(int argc, char** argv) {
             modra::TaskService tasks(database);
             modra::DashboardService dashboard(database);
             modra::NoteService notes(database, paths.config, paths.root);
-            modra::run_ui(projects, tasks, dashboard, notes);
+            modra::run_ui(projects, tasks, dashboard, notes, paths, database.sqlite_version());
         }
 
         spdlog::info("MODRA closing");
