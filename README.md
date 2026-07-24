@@ -1,72 +1,25 @@
 # MODRA
 
-MODRA es un centro personal de control y memoria para organizar proyectos, tarjetas de seguimiento y conocimiento técnico reutilizable desde la consola.
+![MODRA dashboard](docs/assets/modra-dashboard.png)
 
-## Estado actual
+**MODRA** es una herramienta personal de consola para organizar proyectos, tareas en seguimiento y conocimiento técnico reutilizable. Está pensada como un centro local de control y memoria: ayuda a recordar qué revisar, qué está bloqueado, qué temas siguen abiertos y dónde quedó guardado el contexto importante.
 
-La versión `0.1.0` contiene la base técnica y gestión persistente de proyectos, tareas y notas personales desde la interfaz FTXUI. Cada tarea pertenece directamente a un proyecto, sin una entidad intermedia. El responsable es texto opcional y no existe un catálogo de personas.
+[![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?logo=cplusplus&logoColor=white)](https://isocpp.org/)
+[![CMake](https://img.shields.io/badge/CMake-3.24%2B-064F8C?logo=cmake&logoColor=white)](https://cmake.org/)
+[![SQLite](https://img.shields.io/badge/SQLite-local-003B57?logo=sqlite&logoColor=white)](https://sqlite.org/)
+[![Windows](https://img.shields.io/badge/Windows-installer-0078D4?logo=windows&logoColor=white)](#descarga)
 
-## Qué es MODRA
+## Descarga
 
-MODRA está diseñada para un único usuario. Sus tareas funcionan como tarjetas personales de radar: algo que hacer, revisar, consultar, esperar o seguir. También pueden resumir un ticket o asunto cuya información oficial vive fuera de MODRA.
+Para instalar MODRA en Windows, descargá el instalador desde GitHub Releases:
 
-Jira y otras herramientas externas siguen siendo la fuente oficial del trabajo del equipo. MODRA no intenta reemplazar sus tickets, comentarios, asignaciones ni flujos.
+**[Descargar MODRA para Windows](https://github.com/PricKG/MODRA/releases/latest/download/MODRA-Setup-0.1.0.exe)**
 
-La pregunta para evaluar una funcionalidad nueva es:
+También podés descargar el checksum:
 
-> ¿Esto me ayuda a recordar, entender, revisar o encontrar información más rápido?
+[MODRA-Setup-0.1.0.exe.sha256](https://github.com/PricKG/MODRA/releases/latest/download/MODRA-Setup-0.1.0.exe.sha256)
 
-MODRA no planifica usuarios, permisos, catálogo formal de personas, subtareas, dependencias complejas, comentarios encadenados, auditoría detallada, flujos configurables, métricas de productividad ni gestión de carga del equipo.
-
-## Dependencias
-
-- C++20 y CMake 3.24 o posterior.
-- FTXUI, CLI11, SQLite, spdlog, nlohmann/json y Catch2.
-- Git para descargar dependencias mediante `FetchContent`.
-
-CMake descarga las dependencias fijadas a versiones concretas durante la configuracion. No se requiere Conan, vcpkg ni una instalacion del SDK de SQLite.
-
-## Configurar, compilar y probar
-
-En Windows, con Visual Studio 2026 y la carga de trabajo **Desktop development with C++** instalada:
-
-```powershell
-cmake --preset debug
-cmake --build --preset debug
-ctest --preset debug
-```
-
-## Ejecutar
-
-Desde la raiz del repositorio, luego de compilar:
-
-```powershell
-.\build\debug\Debug\modra.exe
-.\build\debug\Debug\modra.exe --help
-.\build\debug\Debug\modra.exe --version
-.\build\debug\Debug\modra.exe doctor
-```
-
-`modra` abre una estructura permanente con encabezado, menú lateral, panel principal y barra de ayuda. Las flechas cambian la sección y actualizan inmediatamente el panel, sin presionar `Enter`. `Tab` o `→` mueve el foco al contenido; `Esc` vuelve al nivel anterior y, desde la raíz de una sección, devuelve el foco al menú. `j` y `k` no son atajos de MODRA. Los demás atajos alfabéticos aceptan mayúsculas y minúsculas (`n` equivale a `N`). Desde el menú, `q` solicita confirmación y una segunda `q` cierra MODRA.
-
-## Instalador Release para Windows
-
-MODRA genera un único instalador en la raíz del proyecto. No necesita la carpeta `migrations/` al ejecutarse e incluye los runtimes de Visual C++ requeridos.
-
-```powershell
-cmake --preset release-windows
-cmake --build --preset release-windows
-.\packaging\windows\BuildInstaller.ps1
-```
-
-El resultado es:
-
-```text
-MODRA-Setup-0.1.0.exe
-MODRA-Setup-0.1.0.exe.sha256
-```
-
-El instalador utiliza IExpress, incluido en Windows, y no necesita NSIS ni WiX. Instala MODRA por usuario en `%LOCALAPPDATA%\Programs\MODRA`, agrega esa carpeta al `PATH`, crea un acceso en el menú Inicio y registra MODRA en **Aplicaciones instaladas**. No elimina la base ni los datos personales al desinstalar.
+> Nota: el enlace directo funciona cuando la release publicada contiene los archivos `MODRA-Setup-0.1.0.exe` y `MODRA-Setup-0.1.0.exe.sha256`.
 
 Después de instalar, abrí una terminal nueva y ejecutá:
 
@@ -76,129 +29,216 @@ modra doctor
 modra
 ```
 
-## Gestión de proyectos
+## Propósito
 
-Seleccioná **Proyectos** con las flechas y el listado aparecerá inmediatamente; usá `Tab` o `→` para mover el foco al contenido. La pantalla permite crear, consultar, editar, buscar y archivar proyectos. Los proyectos archivados se conservan en SQLite y se consultan desde una vista separada; no existe eliminación física.
+MODRA existe para responder rápido preguntas prácticas del trabajo diario:
 
-Atajos disponibles:
+- Qué proyectos y temas tengo en el radar.
+- Qué tengo que revisar hoy.
+- Qué seguimientos están atrasados.
+- Qué está bloqueado y por qué.
+- Dónde guardé una solución, consulta SQL, procedimiento o referencia técnica.
 
-- Flechas: mover la selección.
-- `Enter`: abrir el detalle.
-- `n`: crear un proyecto.
-- `e`: editar el proyecto seleccionado.
-- `a`: solicitar el archivado con confirmación.
-- `v`: alternar entre proyectos activos y archivados.
-- `/`: buscar por nombre o alias.
-- `r`: recargar el listado.
-- `Ctrl+S`: guardar el formulario.
-- `Esc` o `q`: cancelar o volver.
-- `?`: abrir la ayuda contextual.
+La pregunta guía del producto es:
 
-Estados permitidos:
+> ¿Esto me ayuda a recordar, entender, revisar o encontrar información más rápido?
 
-- `planned` — Planificado.
-- `active` — Activo.
-- `paused` — En pausa.
-- `completed` — Finalizado.
-- `archived` — Archivado.
+Si una funcionalidad no ayuda a eso, probablemente no corresponde a MODRA.
 
-Ejemplo básico:
+## Qué es y qué no es
 
-1. Ejecutá `modra` y abrí **Proyectos**.
-2. Presioná `n`, ingresá el nombre y revisá el alias generado.
-3. Completá opcionalmente descripción, fechas y ruta local.
-4. Presioná `Ctrl+S` para guardar.
-5. Usá `e` para editar o `a` para archivar.
+MODRA es una aplicación local, personal y de un único usuario. Las tareas son tarjetas de seguimiento: pueden representar algo por hacer, algo por consultar, una respuesta pendiente, un bloqueo, una revisión futura o una referencia breve a un asunto externo.
 
-El alias se normaliza a minúsculas y admite letras ASCII, números, guion y guion bajo. Las fechas usan el formato `YYYY-MM-DD`; la fecha objetivo no puede ser anterior a la inicial. La ruta local no necesita existir todavía.
+MODRA no reemplaza Jira, GitHub Issues ni otras herramientas oficiales del equipo. Esas herramientas siguen siendo la fuente oficial de tickets, comentarios, asignaciones y flujos. MODRA guarda contexto personal y resumido para trabajar con menos fricción.
 
-## Gestión de tareas
+Fuera de alcance:
 
-Seleccioná un proyecto y presioná `t`, tanto desde el listado como desde su detalle. La pantalla de tareas permite crear, consultar, editar, buscar y archivar tareas del proyecto seleccionado.
+- Usuarios, roles, permisos o autenticación.
+- Sincronización completa con Jira u otras plataformas.
+- Comentarios encadenados, menciones o colaboración.
+- Subtareas, dependencias complejas o Gantt.
+- Catálogo formal de personas.
+- Métricas de productividad, carga o rendimiento.
+- Servidor web, nube o aplicación móvil.
 
-Atajos disponibles:
+## Capturas
 
-- Flechas: mover la selección.
-- `Enter`: abrir el detalle de la tarea.
-- `n`: crear una tarea.
-- `e`: editar la tarea seleccionada.
-- `a`: archivar con confirmación.
-- `u`: desarchivar la tarea seleccionada desde la vista de archivadas.
-- `v`: alternar entre tareas activas y archivadas.
-- `/`: buscar por título.
-- `r`: recargar.
-- `Ctrl+S`: guardar el formulario.
-- `Esc` o `q`: cancelar o volver al proyecto.
-- `?`: abrir la ayuda contextual.
+Las siguientes capturas fueron generadas ejecutando MODRA con una base temporal de demostración.
 
-Toda tarea requiere un proyecto y un título. El nombre de la persona responsable es opcional, informativo y se escribe libremente. Su ausencia no representa un error. La tarea comienza en estado `pending` y prioridad `normal` si no se indica otra. Una tarea bloqueada requiere un motivo; al marcarla como finalizada se registra automáticamente la fecha de finalización. La fecha visible como **Seguimiento** puede representar una revisión personal o un límite real.
+### Dashboard
 
-Tipos permitidos: `technical`, `administrative`, `management`, `research`, `documentation` y `follow_up`.
+![Dashboard de MODRA](docs/assets/modra-dashboard.png)
 
-Estados permitidos: `pending`, `in_progress`, `blocked`, `in_review`, `completed` y `cancelled`.
+El dashboard resume lo que requiere atención: proyectos activos, tareas en radar, seguimientos de hoy, atrasos, bloqueos, prioridades críticas y notas favoritas.
 
-Prioridades permitidas: `low`, `normal`, `high` y `critical`.
+### Mi trabajo
 
-## Vista global Mi trabajo
+![Vista Mi trabajo](docs/assets/modra-work.png)
 
-La sección **Mi trabajo** consulta y gestiona tareas de todos los proyectos sin entrar en cada proyecto. Las tareas de proyectos archivados no aparecen en vistas activas y quedan disponibles, en modo consulta, dentro de **Archivadas**.
+La vista **Mi trabajo** permite consultar tareas de todos los proyectos, filtrar por estado, prioridad, responsable textual, fecha de seguimiento y buscar por texto.
 
-Vistas rápidas:
+### Conocimiento
 
-- `1` Todas las tareas no archivadas.
-- `2` Hoy.
-- `3` Atrasadas: la fecha de seguimiento o límite ya pasó.
-- `4` Próximas durante los siguientes siete días.
-- `5` Bloqueadas.
-- `6` Finalizadas durante los últimos siete días.
-- `7` Archivadas.
-- `v` alterna rápidamente entre Todas y Archivadas.
+![Base de conocimiento](docs/assets/modra-knowledge.png)
 
-La búsqueda `/` incluye título, descripción, responsable, nombre y alias del proyecto. Se combina con los filtros abiertos mediante `f`: proyecto, responsable textual, tareas sin responsable, estado, tipo, prioridad y presencia de fecha de seguimiento. `c` limpia los filtros dentro del panel.
+La sección **Conocimiento** guarda notas personales en Markdown dentro de SQLite. Una nota puede ser global o relacionarse opcionalmente con un proyecto y una tarea.
 
-El orden inicial prioriza seguimientos atrasados, prioridad crítica/alta y fechas próximas. `s` alterna entre orden recomendado, fecha de seguimiento, prioridad, estado, proyecto, responsable y última actualización. Los filtros y el orden no se guardan al cerrar MODRA.
+## Funcionalidades principales
 
-Desde esta vista se puede crear (`n`), editar (`e`), archivar (`a`), desarchivar (`u`) y abrir el detalle (`Enter`). El formulario global permite elegir o cambiar el proyecto usando únicamente proyectos no archivados. Una tarea solo puede desarchivarse si su proyecto continúa activo. Desde el detalle, `p` abre el proyecto relacionado.
+- Dashboard informativo con seguimientos, bloqueos, prioridades y notas favoritas.
+- Gestión persistente de proyectos.
+- Tareas personales de radar asociadas directamente a proyectos.
+- Responsable textual opcional, sin catálogo de personas.
+- Vista global **Mi trabajo** con filtros, búsqueda y ordenamientos.
+- Notas en Markdown para soluciones, minutas, SQL, configuraciones y referencias.
+- Editor externo configurable para editar contenido largo.
+- Archivado lógico y reversible de tareas y notas.
+- Datos locales en SQLite.
+- Migraciones SQL embebidas en el ejecutable.
+- Logs locales y comando `doctor`.
+- Instalador Windows por usuario.
 
-## Notas y base de conocimiento
+## Uso básico
 
-La sección **Conocimiento** guarda información personal reutilizable en Markdown dentro de SQLite: notas generales, información técnica, soluciones, minutas, consultas SQL, procedimientos, configuraciones y referencias. Una nota puede ser global o relacionarse opcionalmente con un proyecto y una tarea.
+Ejecutá MODRA desde una terminal:
 
-Tipos disponibles:
+```powershell
+modra
+```
 
-- `general` — General.
-- `technical` — Técnica.
-- `solution` — Solución.
-- `meeting` — Reunión.
-- `sql` — SQL.
-- `procedure` — Procedimiento.
-- `configuration` — Configuración.
-- `reference` — Referencia.
+La interfaz mantiene una estructura fija: encabezado, menú lateral, panel principal y barra inferior de ayuda.
 
-Las favoritas se identifican con `*` y aparecen primero. Cada nota conserva su propio valor de favorita: marcar una no modifica las demás y se pueden mantener tantas como sean necesarias. El listado permite buscar por título, contenido, tipo, proyecto y tarea. Los filtros se alternan por tipo (`t`), proyecto o notas globales (`p`) y alcance (`g`: todas, favoritas, con tarea o sin tarea); `c` limpia todos los filtros. El alcance **Favoritas** muestra todas las notas favoritas activas.
+Navegación general:
+
+- Flechas: cambiar selección.
+- `Tab` o `→`: mover el foco al panel.
+- `Esc` o `←`: volver al nivel anterior.
+- `?`: abrir ayuda contextual.
+- `q`: salir o volver, según el contexto.
+- Atajos alfabéticos: no distinguen mayúsculas de minúsculas.
+
+## Proyectos
+
+Un proyecto agrupa contexto personal y elementos en seguimiento.
+
+Campos principales:
+
+- Nombre y alias.
+- Descripción.
+- Estado.
+- Fecha inicial y fecha objetivo.
+- Ruta local.
+- Fechas de creación, actualización y archivado.
+
+Estados disponibles:
+
+- `planned`: Planificado.
+- `active`: Activo.
+- `paused`: En pausa.
+- `completed`: Finalizado.
+- `archived`: Archivado.
 
 Atajos principales:
 
-- Flechas: navegar.
-- `Enter`: abrir el detalle.
-- `n`: crear una nota.
-- `e`: editar metadatos y contenido.
-- `f`: marcar o quitar favorita.
+- `n`: crear proyecto.
+- `e`: editar proyecto.
 - `a`: archivar con confirmación.
-- `u`: desarchivar la nota seleccionada desde la vista de archivadas.
-- `v`: alternar activas y archivadas.
-- `/`: buscar.
-- `t`, `p`, `g`: cambiar filtros.
-- `c`: limpiar filtros.
+- `v`: alternar activos y archivados.
+- `/`: buscar por nombre o alias.
 - `r`: recargar.
-- `Esc` o `q`: cancelar o volver.
-- `?`: abrir la ayuda contextual.
+- `Ctrl+S`: guardar formulario.
 
-En el detalle, `o` vuelve a abrir el contenido en el editor externo; `p` abre el proyecto y `t` la tarea relacionada. Las flechas desplazan el contenido. En los detalles de proyecto y tarea, `n` crea una nota relacionada y las teclas `1` a `5` abren las notas recientes mostradas.
+## Tareas en radar
 
-### Editor externo
+Una tarea de MODRA pertenece siempre a un proyecto. No hay módulos ni una capa intermedia.
 
-MODRA edita el título y el cuerpo juntos en un archivo temporal UTF-8 con extensión `.md`. El documento siempre comienza con una ayuda identificada por `MODRA_DOCUMENT_V1`, seguida del primer encabezado `#`, que representa el título definitivo. Todo lo posterior es el cuerpo Markdown:
+Una tarea puede representar:
+
+- Algo que hacer.
+- Algo que revisar.
+- Algo que consultar.
+- Un tema bloqueado.
+- Una respuesta pendiente.
+- Una referencia simplificada a un ticket o asunto externo.
+
+Campos principales:
+
+- Proyecto obligatorio.
+- Título.
+- Descripción breve.
+- Responsable textual opcional.
+- Tipo, estado y prioridad.
+- Fecha de seguimiento o límite.
+- Motivo de bloqueo.
+- Archivado lógico.
+
+Tipos:
+
+- `technical`
+- `administrative`
+- `management`
+- `research`
+- `documentation`
+- `follow_up`
+
+Estados:
+
+- `pending`
+- `in_progress`
+- `blocked`
+- `in_review`
+- `completed`
+- `cancelled`
+
+Prioridades:
+
+- `low`
+- `normal`
+- `high`
+- `critical`
+
+## Mi trabajo
+
+**Mi trabajo** muestra tareas de todos los proyectos sin entrar proyecto por proyecto.
+
+Vistas rápidas:
+
+- `1`: Todas.
+- `2`: Hoy.
+- `3`: Atrasadas.
+- `4`: Próximas durante los siguientes siete días.
+- `5`: Bloqueadas.
+- `6`: Finalizadas recientemente.
+- `7`: Archivadas.
+
+La búsqueda `/` incluye título, descripción, responsable, nombre del proyecto y alias del proyecto. Los filtros permiten combinar proyecto, responsable textual, tareas sin responsable, estado, tipo, prioridad y presencia de fecha.
+
+## Conocimiento
+
+La base de conocimiento guarda notas personales reutilizables:
+
+- Soluciones a errores.
+- Consultas SQL.
+- Fragmentos de código.
+- Procedimientos.
+- Minutas.
+- Configuraciones.
+- Referencias técnicas.
+
+Tipos de nota:
+
+- `general`
+- `technical`
+- `solution`
+- `meeting`
+- `sql`
+- `procedure`
+- `configuration`
+- `reference`
+
+Las notas se editan como un documento Markdown completo mediante un editor externo. El primer encabezado `#` representa el título y el contenido posterior representa el cuerpo. MODRA conserva título y cuerpo por separado en SQLite, sin implementar un parser Markdown general.
+
+Ejemplo de documento editable:
 
 ````md
 <!--
@@ -207,32 +247,25 @@ MODRA_DOCUMENT_V1
 Formato:
 - El primer encabezado "# " es el título del documento.
 - Todo lo que aparece después es el cuerpo en Markdown.
-- Se permiten subtítulos, listas, tablas, enlaces y bloques de código.
 -->
 
 # Problema de generación de PDF
 
 ## Contexto
 
-El cierre mensual falla cuando...
+El cierre mensual falla cuando se genera el reporte.
 
 ```sql
 SELECT * FROM monthly_closures;
 ```
 ````
 
-El comentario es únicamente una guía del archivo editable: no se guarda como contenido ni aparece en el detalle. El encabezado `#` debe tener un título y el cuerpo posterior no puede quedar vacío. Los encabezados `##`, listas, tablas, comentarios HTML y bloques de código del cuerpo se conservan sin intentar renderizar Markdown de forma completa.
-
-Al abrir una nota anterior, MODRA construye este documento usando el título y contenido ya almacenados; no se requiere migración ni se modifican notas sin que el usuario las edite. Si el título se cambia en el editor, el listado y el detalle utilizan el nuevo valor al guardar.
-
-MODRA suspende temporalmente la interfaz, espera al editor, interpreta el documento y persiste título y cuerpo por separado en SQLite. El temporal se elimina después de guardar correctamente. Ante un fallo del editor, un formato inválido o un error de persistencia, la nota original permanece intacta y el temporal se conserva para recuperar el texto; el mensaje de error informa su ruta.
-
 El editor se resuelve en este orden:
 
 1. `editor.command` dentro de `config.json`.
 2. Variable `VISUAL`.
 3. Variable `EDITOR`.
-4. `notepad.exe` en Windows; `nano` o `vi` cuando estén disponibles en otros sistemas.
+4. `notepad.exe` en Windows; `nano` o `vi` en otros sistemas cuando estén disponibles.
 
 Ejemplo de configuración:
 
@@ -245,30 +278,104 @@ Ejemplo de configuración:
 }
 ```
 
-Los comandos con rutas que contienen espacios deben escribir el ejecutable entre comillas. MODRA lanza el proceso directamente y no envía el contenido Markdown a una shell.
+## Datos locales
 
-El intérprete reconoce solamente el formato controlado de MODRA: no es un parser Markdown general. El primer `# ` visible fuera de un bloque de código es el título; el resto se conserva como cuerpo.
+MODRA guarda sus datos localmente.
 
-## Dashboard
+- Windows: `%LOCALAPPDATA%\MODRA`
+- Linux: `$XDG_DATA_HOME/modra` o `~/.local/share/modra`
+- macOS: `~/Library/Application Support/MODRA`
 
-El dashboard es un panel visual, informativo y compacto. Sus cuatro tarjetas superiores muestran proyectos activos, tareas en radar, tareas para hoy y seguimientos atrasados. Las tarjetas, métricas y filas de tareas no son seleccionables y no abren otras pantallas.
+El directorio contiene:
 
-También incluye:
+- `modra.db`
+- `config.json`
+- `backups/`
+- `exports/`
+- `logs/`
 
-- Distribución compacta de las tarjetas en radar por estado y prioridad.
-- Los cinco próximos seguimientos, ordenados por fecha y prioridad.
-- Hasta cinco tareas que requieren atención, sin duplicados: atrasadas, bloqueadas o críticas.
-- Hasta cinco notas favoritas activas, ordenadas por última modificación, con tipo, proyecto, tarea y fecha de actualización.
-- Un indicador `+ N favoritas más` cuando existen otras; `Enter` abre la nota seleccionada o Conocimiento filtrado por todas las favoritas.
-- Estados vacíos específicos y un inicio guiado cuando todavía no existen datos.
+El log principal se escribe en `logs/modra.log`.
 
-El contenido se carga al seleccionar Dashboard y se actualiza con `r` o al volver desde Conocimiento. La barra lateral permanece siempre visible. `Tab` o `→` mueve el foco al panel de favoritas; allí las flechas seleccionan una nota y `Enter` abre su detalle. El último renglón abre Conocimiento con el filtro **Favoritas**. `Esc`, `←` o `q` devuelve el foco al menú.
+## Compilar desde código fuente
 
-Una nota favorita global se identifica como `Global`. Las notas relacionadas muestran el proyecto y, cuando corresponde, `Tarea: <título>`. Si la tarea o el proyecto están archivados, el dashboard lo indica sin ocultar la nota ni impedir abrirla. Archivar una nota la quita del panel; restaurarla conserva su condición de favorita.
+Requisitos:
 
-En terminales amplias las tarjetas y gráficos se distribuyen en columnas. En tamaños medianos las tarjetas se organizan en dos filas. En terminales estrechas la barra lateral reduce su ancho pero permanece visible, mientras los paneles se apilan y los títulos largos se recortan. Por debajo de 52 columnas, el panel muestra un aviso para ampliar la terminal y mantiene disponible el menú.
+- C++20.
+- CMake 3.24 o posterior.
+- Git.
+- En Windows: Visual Studio 2026 con la carga **Desktop development with C++**.
 
-El dashboard evita métricas de productividad. Sus cantidades sirven para decidir qué revisar, no para medir rendimiento personal o de equipo.
+Configurar, compilar y ejecutar pruebas:
+
+```powershell
+cmake --preset debug
+cmake --build --preset debug
+ctest --preset debug
+```
+
+Ejecutar desde el repositorio:
+
+```powershell
+.\build\debug\Debug\modra.exe
+.\build\debug\Debug\modra.exe --help
+.\build\debug\Debug\modra.exe --version
+.\build\debug\Debug\modra.exe doctor
+```
+
+CMake descarga dependencias fijadas mediante `FetchContent`: FTXUI, CLI11, SQLite, spdlog, nlohmann/json y Catch2.
+
+## Generar el instalador Windows
+
+El instalador release se genera en la raíz del proyecto:
+
+```powershell
+cmake --preset release-windows
+cmake --build --preset release-windows
+.\packaging\windows\BuildInstaller.ps1
+```
+
+Resultado esperado:
+
+```text
+MODRA-Setup-0.1.0.exe
+MODRA-Setup-0.1.0.exe.sha256
+```
+
+El instalador usa IExpress, incluido en Windows. Instala MODRA por usuario en `%LOCALAPPDATA%\Programs\MODRA`, agrega esa carpeta al `PATH`, crea un acceso en el menú Inicio y registra MODRA en **Aplicaciones instaladas**. Al desinstalar, no elimina la base de datos ni los datos personales.
+
+Para publicar una nueva descarga, subí ambos archivos como assets de una GitHub Release. El enlace directo del README apunta al asset de la última release publicada.
+
+## Arquitectura
+
+```text
+src/
+├── ui/              Pantallas, navegación y entrada.
+├── application/     Casos de uso y coordinación.
+├── domain/          Project, Task, Note y valores controlados.
+└── infrastructure/  SQLite, configuración y sistema.
+```
+
+Componentes relevantes:
+
+- `src/ui/`: interfaz FTXUI.
+- `src/application/`: servicios de proyectos, tareas, dashboard y notas.
+- `src/domain/`: entidades y enumeraciones controladas.
+- `src/infrastructure/database/`: repositorios SQLite.
+- `src/infrastructure/config/`: directorios de datos y configuración.
+- `migrations/`: SQL versionado del esquema.
+- `tests/`: pruebas unitarias e integración.
+
+## Migraciones
+
+Los archivos de `migrations/` son la única fuente de verdad del esquema. CMake los valida, ordena por versión y genera código C++ con el SQL embebido. El ejecutable no necesita leer archivos `.sql` en tiempo de ejecución.
+
+Reglas del proyecto:
+
+- No modificar migraciones ya aplicadas.
+- Todo cambio real de esquema requiere una migración nueva y versionada.
+- No duplicar SQL de migraciones dentro de código C++.
+- Usar consultas parametrizadas.
+- Las pruebas deben usar bases temporales, nunca datos reales.
 
 ## Roadmap
 
@@ -279,42 +386,32 @@ El dashboard evita métricas de productividad. Sus cantidades sirven para decidi
 5. Referencias externas opcionales en tareas.
 6. Comandos frecuentes.
 7. Backups y restauración.
-8. Consulta Git/SVN.
+8. Consulta Git/SVN en modo lectura.
 9. Exportaciones.
 10. Mejoras basadas en uso real.
 
-No forman parte del roadmap el historial detallado de tareas, comentarios encadenados, dependencias complejas, catálogo de personas, gestión formal del equipo, métricas de productividad ni funciones equivalentes a Jira.
+## Estado actual
 
-## Datos locales
+Versión: `0.1.0`
 
-- Windows: `%LOCALAPPDATA%\MODRA`
-- Linux: `$XDG_DATA_HOME/modra` o `~/.local/share/modra`
-- macOS: `~/Library/Application Support/MODRA`
+Estado funcional:
 
-El directorio contiene `modra.db`, `config.json`, `backups/`, `exports/` y `logs/`. El log principal se escribe en `logs/modra.log`.
+- Base técnica implementada.
+- Persistencia SQLite con migraciones.
+- Gestión de proyectos y tareas.
+- Dashboard informativo.
+- Base de conocimiento con notas Markdown.
+- Instalador Windows.
+- Pruebas con Catch2.
 
-## Migraciones de base de datos
+Limitaciones actuales:
 
-Los archivos versionados de [`migrations/`](migrations/) son la única fuente de verdad del esquema. Durante la configuración, CMake valida sus nombres, los ordena por versión y genera código C++ dentro de `build/` con el SQL embebido. Por eso el ejecutable no necesita encontrar la carpeta `migrations/` en tiempo de ejecución.
+- No hay restauración de proyectos archivados.
+- No hay etiquetas ni adjuntos en notas.
+- No hay renderizado Markdown completo dentro de la UI.
+- Los filtros y ordenamientos no se guardan entre ejecuciones.
+- Git/SVN, backups, exportaciones y comandos frecuentes están en roadmap.
 
-Una migración futura debe agregarse como un nuevo archivo `NNN_nombre.sql`, con una versión no utilizada y un nombre claro. Una migración que ya fue aplicada es inmutable: cualquier modificación posterior del esquema requiere otro archivo versionado; el SQL no debe copiarse en `Database.cpp` ni en otro código C++.
+## Licencia
 
-## Estructura
-
-- `cmake/`: cabeceras configuradas por CMake.
-- `migrations/`: SQL versionado y legible de las migraciones.
-- `src/application/`: informacion y coordinacion basica de la aplicacion.
-- `src/domain/`: entidades Project, Task y Note con sus valores controlados.
-- `src/infrastructure/`: datos locales, SQLite y deteccion del entorno.
-- `src/ui/`: interfaz interactiva FTXUI.
-- `tests/`: pruebas unitarias y de integracion con recursos temporales.
-
-## Limitaciones actuales
-
-- El responsable se conserva deliberadamente como texto opcional; no se planifica un catálogo formal de personas.
-- Las notas no tienen etiquetas, adjuntos, enlaces entre sí, historial de versiones ni renderizado Markdown completo.
-- No se planifican dependencias complejas ni comentarios encadenados; las etiquetas quedan pospuestas hasta demostrar una necesidad personal real.
-- La vista Mi trabajo no asume qué responsable representa al usuario.
-- Los filtros y ordenamientos globales no persisten entre ejecuciones.
-- No se pueden restaurar proyectos archivados ni eliminarlos físicamente.
-- La búsqueda de proyectos se realiza en memoria sobre el listado cargado.
+El repositorio todavía no declara una licencia explícita. Antes de distribuir MODRA públicamente, agregá un archivo `LICENSE` con la licencia elegida.
