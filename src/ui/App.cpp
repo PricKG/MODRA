@@ -23,6 +23,7 @@
 #include "ui/KeyEvent.h"
 #include "ui/ProjectScreen.h"
 #include "ui/TaskScreen.h"
+#include "ui/ToolsScreen.h"
 #include "ui/WorkScreen.h"
 
 namespace modra {
@@ -42,7 +43,7 @@ void run_ui(ProjectService& projects,
         "Gestión persistente de proyectos y sus tareas.",
         "Tarjetas personales, revisiones, bloqueos y próximos seguimientos.",
         "Notas personales, soluciones y conocimiento reutilizable.",
-        "Vista provisional de herramientas locales.",
+        "Estado de herramientas y repositorios locales.",
         "Rutas locales, editor externo y entorno detectado.",
     };
 
@@ -282,8 +283,10 @@ void run_ui(ProjectService& projects,
             request.favorites = true;
             open_dashboard_knowledge(std::move(request));
         });
+    auto tools_screen = create_tools_screen(projects);
     auto root = Container::Tab(
-        {menu, project_screen, task_screen, work_screen, knowledge_screen, dashboard_screen, configuration_screen},
+        {menu, project_screen, task_screen, work_screen, knowledge_screen, dashboard_screen, configuration_screen,
+         tools_screen},
         &root_tab);
 
     auto activate_section = [&] {
@@ -305,6 +308,7 @@ void run_ui(ProjectService& projects,
         else if (navigation.active == 1) project_screen->OnEvent(Event::Custom);
         else if (navigation.active == 2) work_screen->OnEvent(Event::Custom);
         else if (navigation.active == 3) knowledge_screen->OnEvent(Event::Custom);
+        else if (navigation.active == 4) tools_screen->OnEvent(Event::Custom);
         else if (navigation.active == 5) configuration_screen->OnEvent(Event::Custom);
     };
 
@@ -326,6 +330,9 @@ void run_ui(ProjectService& projects,
             knowledge_visible = true;
             root_tab = 4;
             knowledge_screen->TakeFocus();
+        } else if (navigation.active == 4) {
+            root_tab = 7;
+            tools_screen->TakeFocus();
         } else if (navigation.active == 5) {
             root_tab = 6;
             configuration_screen->TakeFocus();
@@ -358,6 +365,8 @@ void run_ui(ProjectService& projects,
             content = knowledge_screen->Render() | flex;
         } else if (navigation.active == 0) {
             content = dashboard_screen->Render() | flex | border;
+        } else if (navigation.active == 4) {
+            content = tools_screen->Render() | flex | border;
         } else if (navigation.active == 5) {
             content = configuration_screen->Render() | flex | border;
         } else {
@@ -375,7 +384,10 @@ void run_ui(ProjectService& projects,
                                 ? text(" [↑/↓] Favorita  [Enter] Abrir  [r] Actualizar  [←/Esc] Menú  [?] Ayuda ") |
                                       border
                             : navigation.active == 5
-                                ? text(" [Ctrl+S] Guardar editor  [Ctrl+R] Refrescar  [←/Esc] Menú  [?] Ayuda ") |
+                                ? text(" [Enter] Cambiar editor  [Ctrl+S] Confirmar  [Ctrl+R] Refrescar  [←/Esc] Menú  [?] Ayuda ") |
+                                      border
+                            : navigation.active == 4
+                                ? text(" [↑/↓] Proyecto  [v] Todos/atención  [r] Refrescar  [←/Esc] Menú  [?] Ayuda ") |
                                       border
                                 : text(" [←/Esc] Menú  [Enter] Abrir  [r] Actualizar  [?] Ayuda  [q] Volver ") |
                                       border;
@@ -442,14 +454,16 @@ void run_ui(ProjectService& projects,
                 return false;
             }
             if (navigation.active >= 4) {
-                if (event == Event::Character('?')) {
+                if (navigation.active == 4 && tools_screen->OnEvent(event)) {
+                    return true;
+                } else if (navigation.active == 5 && configuration_screen->OnEvent(event)) {
+                    return true;
+                } else if (event == Event::Character('?')) {
                     help_visible = true;
                 } else if (event == Event::Escape || event == Event::ArrowLeft || shortcut(event, 'q')) {
                     navigation.return_to_menu();
                     root_tab = 0;
                     menu->TakeFocus();
-                } else if (navigation.active == 5) {
-                    return configuration_screen->OnEvent(event);
                 }
                 return true;
             }

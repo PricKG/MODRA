@@ -85,6 +85,8 @@ add_library(modra_core
     src/infrastructure/database/TaskRepository.cpp
     src/infrastructure/system/Environment.cpp
     src/infrastructure/system/ExternalEditor.cpp
+    src/infrastructure/system/Process.cpp
+    src/infrastructure/system/RepositoryInspector.cpp
 )
 target_include_directories(modra_core PUBLIC src "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_compile_definitions(modra_core PRIVATE $<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>)
@@ -103,6 +105,7 @@ add_executable(modra
     src/ui/KnowledgeScreen.cpp
     src/ui/ProjectScreen.cpp
     src/ui/TaskScreen.cpp
+    src/ui/ToolsScreen.cpp
     src/ui/WorkScreen.cpp
 )
 target_link_libraries(modra
@@ -113,10 +116,11 @@ target_link_libraries(modra
         ftxui::dom
         ftxui::screen
 )
+target_compile_definitions(modra PRIVATE $<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>)
 
 function(modra_enable_warnings target)
     if(MSVC)
-        target_compile_options(${target} PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
+        target_compile_options(${target} PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8 /EHsc)
     else()
         target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
     endif()
@@ -136,6 +140,7 @@ if(BUILD_TESTING)
     add_executable(modra_tests
         src/ui/DashboardScreen.cpp
         src/ui/ConfigurationScreen.cpp
+        src/ui/ToolsScreen.cpp
         tests/ConfigurationScreenTests.cpp
         tests/DashboardTests.cpp
         tests/InfrastructureTests.cpp
@@ -143,13 +148,16 @@ if(BUILD_TESTING)
         tests/NoteDocumentTests.cpp
         tests/NoteTests.cpp
         tests/ProjectTests.cpp
+        tests/RepositoryInspectorTests.cpp
         tests/TaskTests.cpp
+        tests/ToolsScreenTests.cpp
         tests/UiShortcutTests.cpp
     )
     add_executable(modra_editor_fixture tests/EditorFixture.cpp)
     modra_enable_warnings(modra_editor_fixture)
     add_dependencies(modra_tests modra_editor_fixture)
     target_compile_definitions(modra_tests PRIVATE MODRA_EDITOR_FIXTURE="$<TARGET_FILE:modra_editor_fixture>")
+    target_compile_definitions(modra_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>)
     target_link_libraries(modra_tests PRIVATE modra_core Catch2::Catch2WithMain ftxui::component)
     modra_enable_warnings(modra_tests)
 

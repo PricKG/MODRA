@@ -29,10 +29,10 @@ TEST_CASE("Configuration screen renders local paths and environment status") {
     CHECK(text.find("MODRA · Configuración") != std::string::npos);
     CHECK(text.find("3.50.4") != std::string::npos);
     CHECK(text.find("modra.db") != std::string::npos);
-    CHECK(text.find("Herramientas detectadas") != std::string::npos);
+    CHECK(text.find("Editor externo") != std::string::npos);
 }
 
-TEST_CASE("Configuration screen saves the selected external editor command") {
+TEST_CASE("Configuration screen opens the editor picker and saves with Enter") {
     const auto root = std::filesystem::temp_directory_path() / "modra-configuration-editor-test";
     std::filesystem::create_directories(root);
     modra::DataPaths paths{
@@ -60,7 +60,13 @@ TEST_CASE("Configuration screen saves the selected external editor command") {
 
     auto screen = modra::create_configuration_screen(paths, "3.50.4");
     screen->TakeFocus();
-    REQUIRE(screen->OnEvent(ftxui::Event::CtrlS));
+    REQUIRE(screen->OnEvent(ftxui::Event::Return));
+    REQUIRE(screen->OnEvent(ftxui::Event::Return));
+
+    auto rendered = screen->Render();
+    auto rendered_output = ftxui::Screen::Create(ftxui::Dimension::Fixed(120), ftxui::Dimension::Fixed(40));
+    Render(rendered_output, rendered);
+    CHECK(rendered_output.ToString().find("JSON válido") == std::string::npos);
 
     std::ifstream input(paths.config);
     const auto config = nlohmann::json::parse(input);
@@ -68,7 +74,43 @@ TEST_CASE("Configuration screen saves the selected external editor command") {
     CHECK(config.at("editor").at("command") == editor_command);
 }
 
-TEST_CASE("Configuration screen renders unavailable editor options as disabled") {
+#ifdef _WIN32
+TEST_CASE("Configuration screen selects, applies and refreshes an editor with Ctrl+S") {
+    const auto root = std::filesystem::temp_directory_path() / "modra-configuration-keyboard-editor-test";
+    std::filesystem::create_directories(root);
+    modra::DataPaths paths{
+        root,
+        root / "modra.db",
+        root / "config.json",
+        root / "backups",
+        root / "exports",
+        root / "logs",
+    };
+    {
+        std::ofstream output(paths.config);
+        output << nlohmann::json{{"version", 1}, {"editor", {{"command", "notepad.exe"}}}}.dump(2) << '\n';
+    }
+
+    auto screen = modra::create_configuration_screen(paths, "3.50.4");
+    screen->TakeFocus();
+    REQUIRE(screen->OnEvent(ftxui::Event::Return));
+    REQUIRE(screen->OnEvent(ftxui::Event::ArrowDown));
+    REQUIRE(screen->OnEvent(ftxui::Event::CtrlS));
+
+    std::ifstream input(paths.config);
+    const auto config = nlohmann::json::parse(input);
+    CHECK(config.at("editor").at("command") == "");
+
+    auto rendered = screen->Render();
+    auto output = ftxui::Screen::Create(ftxui::Dimension::Fixed(120), ftxui::Dimension::Fixed(40));
+    Render(output, rendered);
+    const std::string text = output.ToString();
+    CHECK(text.find("Editor automático configurado.") != std::string::npos);
+    CHECK(text.find("Elegir editor") == std::string::npos);
+}
+#endif
+
+TEST_CASE("Configuration screen keeps unavailable editor diagnostics out of the picker") {
     const auto root = std::filesystem::temp_directory_path() / "modra-configuration-disabled-editor-test";
     std::filesystem::create_directories(root);
     modra::DataPaths paths{
@@ -86,11 +128,12 @@ TEST_CASE("Configuration screen renders unavailable editor options as disabled")
     }
 
     auto screen = modra::create_configuration_screen(paths, "3.50.4");
+    REQUIRE(screen->OnEvent(ftxui::Event::Return));
     auto rendered = screen->Render();
     auto output = ftxui::Screen::Create(ftxui::Dimension::Fixed(120), ftxui::Dimension::Fixed(50));
     Render(output, rendered);
     const std::string text = output.ToString();
 
-    CHECK(text.find("[X]") != std::string::npos);
     CHECK(text.find("modra-editor-that-does-not-exist") != std::string::npos);
+    CHECK(text.find("[X]") == std::string::npos);
 }

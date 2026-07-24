@@ -31,18 +31,8 @@ std::optional<std::string> environment_value(const char* name) {
     return std::string(value);
 }
 
-std::string yes_no(bool value) {
-    return value ? "disponible" : "no disponible";
-}
-
 Element info_row(const std::string& label, const std::string& value) {
     return hbox({text(label) | bold | size(WIDTH, EQUAL, 22), text(value) | flex});
-}
-
-Element status_row(const std::string& label, bool ok) {
-    return hbox({text(label) | bold | size(WIDTH, EQUAL, 22),
-                 text(ok ? "[OK] " : "[ADVERTENCIA] ") | color(ok ? Color::Green : Color::Yellow),
-                 text(yes_no(ok))});
 }
 
 struct EditorChoice {
@@ -59,8 +49,6 @@ struct ConfigurationState {
     }
 
     void reload() {
-        git_available = command_is_available("git");
-        svn_available = command_is_available("svn");
         visual = environment_value("VISUAL");
         editor = environment_value("EDITOR");
         configured_editor = read_configured_editor();
@@ -87,8 +75,8 @@ struct ConfigurationState {
             const std::filesystem::path executable(arguments.front());
             if (executable.is_absolute() || arguments.front().find('/') != std::string::npos ||
                 arguments.front().find('\\') != std::string::npos) {
-                std::error_code error;
-                return std::filesystem::is_regular_file(executable, error);
+                std::error_code filesystem_error;
+                return std::filesystem::is_regular_file(executable, filesystem_error);
             }
 #ifdef _WIN32
             if (arguments.front() == "notepad.exe") return true;
@@ -190,10 +178,13 @@ struct ConfigurationState {
             if (!output) throw std::runtime_error("No se pudo escribir config.json.");
             output << config.dump(2) << '\n';
             if (!output) throw std::runtime_error("No se pudo escribir config.json.");
+            output.close();
+            if (!output) throw std::runtime_error("No se pudo cerrar config.json después de escribirlo.");
 
             message = command.empty() ? "Editor automático configurado." : "Editor guardado.";
             error.clear();
             reload();
+            editor_picker_open = false;
         } catch (const std::exception& exception) {
             error = exception.what();
             message.clear();
@@ -209,6 +200,8 @@ struct ConfigurationState {
             if (candidate >= static_cast<int>(editor_choices.size())) candidate = 0;
             if (editor_choices[static_cast<std::size_t>(candidate)].available) {
                 editor_selected = candidate;
+                message.clear();
+                error.clear();
                 return;
             }
         }
@@ -225,8 +218,7 @@ struct ConfigurationState {
     std::string message;
     std::vector<EditorChoice> editor_choices;
     int editor_selected = 0;
-    bool git_available = false;
-    bool svn_available = false;
+    bool editor_picker_open = false;
 };
 
 }  // namespace
@@ -234,33 +226,14 @@ struct ConfigurationState {
 ftxui::Component create_configuration_screen(DataPaths paths, std::string sqlite_version) {
     auto state = std::make_shared<ConfigurationState>(std::move(paths), std::move(sqlite_version));
     auto component = Renderer([state] {
-        Elements choice_rows;
-        for (std::size_t index = 0; index < state->editor_choices.size(); ++index) {
-            const auto& choice = state->editor_choices[index];
-            const bool selected = static_cast<int>(index) == state->editor_selected;
-            auto row = hbox({
-                text(selected ? "> " : "  ") | size(WIDTH, EQUAL, 2),
-                text(choice.available ? "[OK] " : "[X] ") | color(choice.available ? Color::Green : Color::Yellow),
-                text(choice.label) | flex,
-                text(choice.command.empty() ? "automático" : choice.command) | dim,
-            });
-            if (!choice.available) row = row | dim;
-            if (selected) row = row | inverted;
-            choice_rows.push_back(row);
-            if (!choice.available && !choice.reason.empty()) {
-                choice_rows.push_back(text("    " + choice.reason) | dim);
-            }
-        }
-
         Elements editor_rows{
-            info_row("Configurado", state->configured_editor.empty() ? "Sin editor personalizado" : state->configured_editor),
-            info_row("Editor resuelto", state->resolved_editor.empty() ? "No disponible" : state->resolved_editor),
-            info_row("VISUAL", state->visual.value_or("Sin definir")),
-            info_row("EDITOR", state->editor.value_or("Sin definir")),
+            info_row("Editor actual", state->resolved_editor.empty() ? "No disponible" : state->resolved_editor),
+            info_row("Configuración", state->configured_editor.empty() ? "Selección automática" : "Personalizada"),
             separator(),
-            text("Editor") | bold,
-            vbox(std::move(choice_rows)) | frame,
-            text("Las opciones no válidas para este sistema aparecen desactivadas y se saltean al navegar.") | dim,
+            hbox({
+                text("  Cambiar editor  ") | bold | inverted,
+                text("  Enter") | dim,
+            }) | center,
         };
         if (!state->editor_error.empty()) {
             editor_rows.push_back(text("Error: " + state->editor_error) | color(Color::Yellow));
@@ -268,35 +241,51 @@ ftxui::Component create_configuration_screen(DataPaths paths, std::string sqlite
         if (!state->message.empty()) editor_rows.push_back(text(state->message) | color(Color::Green));
         if (!state->error.empty()) editor_rows.push_back(text("Error: " + state->error) | color(Color::Red));
 
-        return vbox({
-                   text(" MODRA · Configuración ") | bold | color(Color::Cyan),
-                   separator(),
-                   window(text(" Aplicación ") | bold,
-                          vbox({
-                              info_row("Versión", std::string(application_version())),
-                              info_row("Sistema operativo", operating_system_name()),
-                              info_row("SQLite", state->sqlite_version),
-                          })),
-                   window(text(" Datos locales ") | bold,
-                          vbox({
-                              info_row("Directorio", state->paths.root.string()),
-                              info_row("Base SQLite", state->paths.database.string()),
-                              info_row("Config", state->paths.config.string()),
-                              info_row("Backups", state->paths.backups.string()),
-                              info_row("Exportaciones", state->paths.exports.string()),
-                              info_row("Logs", state->paths.logs.string()),
-                          })),
-                   window(text(" Editor externo ") | bold, vbox(std::move(editor_rows))),
-                   window(text(" Herramientas detectadas ") | bold,
-                          vbox({
-                              status_row("Git", state->git_available),
-                              status_row("SVN", state->svn_available),
-                          })),
-                   filler(),
-                   text("↑/↓ elegí editor · Ctrl+S guarda · Ctrl+R refresca · Esc vuelve al menú · ? ayuda") | dim |
-                       center,
-               }) |
-               vscroll_indicator | frame | flex;
+        auto base = vbox({
+                        text(" MODRA · Configuración ") | bold | color(Color::Cyan),
+                        separator(),
+                        window(text(" Editor externo ") | bold, vbox(std::move(editor_rows))),
+                        window(text(" Aplicación ") | bold,
+                               vbox({
+                                   info_row("Versión", std::string(application_version())),
+                                   info_row("Sistema operativo", operating_system_name()),
+                                   info_row("SQLite", state->sqlite_version),
+                               })),
+                        window(text(" Datos locales ") | bold,
+                               vbox({
+                                   info_row("Directorio", state->paths.root.string()),
+                                   info_row("Base SQLite", state->paths.database.string()),
+                                   info_row("Config", state->paths.config.string()),
+                                   info_row("Backups", state->paths.backups.string()),
+                                   info_row("Exportaciones", state->paths.exports.string()),
+                                   info_row("Logs", state->paths.logs.string()),
+                               })),
+                        filler(),
+                        text("Enter cambia el editor · Ctrl+R refresca · Esc vuelve al menú · ? ayuda") | dim | center,
+                    }) |
+                    vscroll_indicator | frame | flex;
+        if (!state->editor_picker_open) return base;
+
+        Elements choice_rows;
+        for (std::size_t index = 0; index < state->editor_choices.size(); ++index) {
+            const auto& choice = state->editor_choices[index];
+            if (!choice.available) continue;
+            const bool selected = static_cast<int>(index) == state->editor_selected;
+            const bool configured = choice.command == state->configured_editor;
+            auto row = hbox({
+                text(selected ? "> " : "  ") | size(WIDTH, EQUAL, 2),
+                text(configured ? "● " : "  ") | color(Color::Cyan),
+                text(choice.label) | flex,
+            });
+            if (selected) row = row | inverted;
+            choice_rows.push_back(row);
+        }
+        choice_rows.push_back(separator());
+        choice_rows.push_back(text("↑/↓ seleccionar · Enter/Ctrl+S confirmar · Esc cancelar") | dim | center);
+        auto picker = window(text(" Elegir editor ") | bold | color(Color::Cyan),
+                             vbox(std::move(choice_rows))) |
+                      size(WIDTH, EQUAL, 64);
+        return dbox({base, picker | clear_under | center});
     });
 
     return CatchEvent(component, [state](Event event) {
@@ -304,16 +293,23 @@ ftxui::Component create_configuration_screen(DataPaths paths, std::string sqlite
             state->reload();
             return true;
         }
-        if (event == Event::ArrowDown) {
-            state->select_next_available(1);
+        if (state->editor_picker_open) {
+            if (event == Event::ArrowDown) {
+                state->select_next_available(1);
+            } else if (event == Event::ArrowUp) {
+                state->select_next_available(-1);
+            } else if (event == Event::Return || event == Event::CtrlS) {
+                state->save_editor();
+            } else if (event == Event::Escape) {
+                state->editor_picker_open = false;
+                state->error.clear();
+            }
             return true;
         }
-        if (event == Event::ArrowUp) {
-            state->select_next_available(-1);
-            return true;
-        }
-        if (event == Event::CtrlS) {
-            state->save_editor();
+        if (event == Event::Return) {
+            state->editor_picker_open = true;
+            state->message.clear();
+            state->error.clear();
             return true;
         }
         if (event == Event::CtrlR) {

@@ -401,6 +401,7 @@ Estado funcional:
 - Gestión de proyectos y tareas.
 - Dashboard informativo.
 - Base de conocimiento con notas Markdown.
+- Herramientas locales con detección de Git, SVN y repositorios asociados a proyectos.
 - Instalador Windows.
 - Pruebas con Catch2.
 
@@ -410,7 +411,10 @@ Limitaciones actuales:
 - No hay etiquetas ni adjuntos en notas.
 - No hay renderizado Markdown completo dentro de la UI.
 - Los filtros y ordenamientos no se guardan entre ejecuciones.
-- Git/SVN, backups, exportaciones y comandos frecuentes están en roadmap.
+- Herramientas consulta Git/SVN en modo lectura: versiones, rama Git, cambios locales y
+  divergencia respecto al remoto cuando esa información está disponible localmente.
+- La vista Git/SVN no ejecuta operaciones de escritura, sincronización ni publicación.
+- Backups, exportaciones y comandos frecuentes están en roadmap.
 
 ## Licencia
 
