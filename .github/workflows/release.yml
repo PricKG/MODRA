@@ -1,0 +1,105 @@
+name: Windows installer
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  installer:
+    name: Build and validate installer
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Configure
+        run: cmake -S . -B build/release-ci -A x64 -DBUILD_TESTING=ON
+
+      - name: Build
+        run: cmake --build build/release-ci --config Release --parallel
+
+      - name: Test release build
+        run: ctest --test-dir build/release-ci -C Release --output-on-failure
+
+      - name: Validate tag version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $binaryVersion = (& .\build\release-ci\Release\modra.exe --version | Out-String).Trim()
+          $tagVersion = "${{ github.ref_name }}".TrimStart("v")
+          if ($binaryVersion -ne "MODRA $tagVersion") {
+            throw "El tag ${{ github.ref_name }} no coincide con $binaryVersion."
+          }
+
+      - name: Install verified Inno Setup
+        shell: pwsh
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP "innosetup-6.7.3.exe"
+          $installDirectory = Join-Path $env:RUNNER_TEMP "inno-setup-6"
+          Invoke-WebRequest `
+            -Uri "https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe" `
+            -OutFile $installer
+          $signature = Get-AuthenticodeSignature -LiteralPath $installer
+          if ($signature.Status -ne "Valid" -or
+              $signature.SignerCertificate.Subject -notmatch "Pyrsys B\.V\.") {
+            throw "La firma de Inno Setup no es válida."
+          }
+          $process = Start-Process -FilePath $installer -ArgumentList @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART",
+            "/DIR=$installDirectory"
+          ) -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "No se pudo instalar Inno Setup."
+          }
+          "INNO_COMPILER=$installDirectory\ISCC.exe" >> $env:GITHUB_ENV
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          .\packaging\windows\BuildInstaller.ps1 `
+            -ReleaseExecutable .\build\release-ci\Release\modra.exe `
+            -OutputDirectory .\dist `
+            -InnoCompiler $env:INNO_COMPILER
+
+      - name: Smoke test installer
+        shell: pwsh
+        run: .\packaging\windows\TestInstaller.ps1 -InstallerPath .\dist\MODRA-Setup.exe
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MODRA-Windows-${{ github.ref_name }}
+          path: |
+            dist/MODRA-Setup.exe
+            dist/MODRA-Setup.exe.sha256
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag `
+              .\dist\MODRA-Setup.exe `
+              .\dist\MODRA-Setup.exe.sha256 `
+              --clobber
+          } else {
+            gh release create $tag `
+              .\dist\MODRA-Setup.exe `
+              .\dist\MODRA-Setup.exe.sha256 `
+              --verify-tag `
+              --generate-notes `
+              --title "MODRA $tag"
+          }

@@ -13,13 +13,15 @@
 
 Para instalar MODRA en Windows, descargá el instalador desde GitHub Releases:
 
-**[Descargar MODRA para Windows](https://github.com/PricKG/MODRA/releases/latest/download/MODRA-Setup-0.1.0.exe)**
+**[Descargar MODRA para Windows](https://github.com/PricKG/MODRA/releases/latest/download/MODRA-Setup.exe)**
 
 También podés descargar el checksum:
 
-[MODRA-Setup-0.1.0.exe.sha256](https://github.com/PricKG/MODRA/releases/latest/download/MODRA-Setup-0.1.0.exe.sha256)
+[MODRA-Setup.exe.sha256](https://github.com/PricKG/MODRA/releases/latest/download/MODRA-Setup.exe.sha256)
 
-> Nota: el enlace directo funciona cuando la release publicada contiene los archivos `MODRA-Setup-0.1.0.exe` y `MODRA-Setup-0.1.0.exe.sha256`.
+El instalador es para Windows 10/11 x64, se instala por usuario y no requiere Visual Studio,
+CMake ni una compilación local. Como todavía no está firmado digitalmente, Windows SmartScreen
+puede solicitar confirmación en la primera ejecución.
 
 Después de instalar, abrí una terminal nueva y ejecutá:
 
@@ -326,7 +328,8 @@ CMake descarga dependencias fijadas mediante `FetchContent`: FTXUI, CLI11, SQLit
 
 ## Generar el instalador Windows
 
-El instalador release se genera en la raíz del proyecto:
+Para generar el instalador se requiere [Inno Setup 6](https://jrsoftware.org/isinfo.php).
+El resultado se escribe en `dist/`:
 
 ```powershell
 cmake --preset release-windows
@@ -334,16 +337,31 @@ cmake --build --preset release-windows
 .\packaging\windows\BuildInstaller.ps1
 ```
 
-Resultado esperado:
-
 ```text
-MODRA-Setup-0.1.0.exe
-MODRA-Setup-0.1.0.exe.sha256
+dist\MODRA-Setup.exe
+dist\MODRA-Setup.exe.sha256
 ```
 
-El instalador usa IExpress, incluido en Windows. Instala MODRA por usuario en `%LOCALAPPDATA%\Programs\MODRA`, agrega esa carpeta al `PATH`, crea un acceso en el menú Inicio y registra MODRA en **Aplicaciones instaladas**. Al desinstalar, no elimina la base de datos ni los datos personales.
+Validar checksum, instalación, `modra doctor` y desinstalación:
 
-Para publicar una nueva descarga, subí ambos archivos como assets de una GitHub Release. El enlace directo del README apunta al asset de la última release publicada.
+```powershell
+.\packaging\windows\TestInstaller.ps1
+```
+
+El instalador instala MODRA por usuario en `%LOCALAPPDATA%\Programs\MODRA`, ofrece agregar la
+carpeta al `PATH`, crea accesos directos y registra un desinstalador en **Aplicaciones instaladas**.
+Al desinstalar, conserva la base de datos y los datos personales.
+
+La publicación está automatizada en GitHub Actions. Un tag que coincida con la versión de CMake
+compila y prueba Release, genera el instalador y crea la GitHub Release:
+
+```powershell
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+Los assets mantienen nombres estables, por lo que el enlace de descarga del README siempre apunta
+a la última versión publicada.
 
 ## Arquitectura
 
@@ -392,7 +410,7 @@ Reglas del proyecto:
 
 ## Estado actual
 
-Versión: `0.1.0`
+Versión: `0.2.0`
 
 Estado funcional:
 
@@ -401,6 +419,7 @@ Estado funcional:
 - Gestión de proyectos y tareas.
 - Dashboard informativo.
 - Base de conocimiento con notas Markdown.
+- Herramientas locales con detección de Git, SVN y repositorios asociados a proyectos.
 - Instalador Windows.
 - Pruebas con Catch2.
 
@@ -410,7 +429,10 @@ Limitaciones actuales:
 - No hay etiquetas ni adjuntos en notas.
 - No hay renderizado Markdown completo dentro de la UI.
 - Los filtros y ordenamientos no se guardan entre ejecuciones.
-- Git/SVN, backups, exportaciones y comandos frecuentes están en roadmap.
+- Herramientas consulta Git/SVN en modo lectura: versiones, rama Git, cambios locales y
+  divergencia respecto al remoto cuando esa información está disponible localmente.
+- La vista Git/SVN no ejecuta operaciones de escritura, sincronización ni publicación.
+- Backups, exportaciones y comandos frecuentes están en roadmap.
 
 ## Licencia
 
