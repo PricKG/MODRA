@@ -5,3 +5,4 @@
 *.suo
 /MODRA-Setup-*.exe
 /MODRA-Setup-*.exe.sha256
+/dist/

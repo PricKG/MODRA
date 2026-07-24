@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(MODRA VERSION 0.1.0 LANGUAGES C CXX)
+project(MODRA VERSION 0.2.0 LANGUAGES C CXX)
 
 include(FetchContent)
 include(CTest)
@@ -12,6 +12,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(MSVC)
     add_compile_options(/FS)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
 set(FTXUI_BUILD_DOCS OFF CACHE BOOL "" FORCE)

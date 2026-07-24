@@ -221,5 +221,5 @@ TEST_CASE("A failing migration rolls back the complete migration transaction") {
 
 TEST_CASE("Application version is available from the shared core") {
     CHECK(modra::application_name() == "MODRA");
-    CHECK(modra::application_version() == "0.1.0");
+    CHECK(modra::application_version() == "0.2.0");
 }

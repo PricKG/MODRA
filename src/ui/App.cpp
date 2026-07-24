@@ -12,6 +12,7 @@
 #include <ftxui/dom/elements.hpp>
 #include <ftxui/screen/terminal.hpp>
 
+#include "application/AppInfo.h"
 #include "application/DashboardService.h"
 #include "application/NoteService.h"
 #include "application/ProjectService.h"
@@ -374,7 +375,7 @@ void run_ui(ProjectService& projects,
                                  color(Color::Cyan),
                             separator(), text(" Esta sección todavía no está implementada."),
                             text(" " + descriptions[static_cast<std::size_t>(navigation.active)]) | dim,
-                            filler(), text(" MODRA 0.1.0 ") | dim}) |
+                            filler(), text(" MODRA " + std::string(application_version()) + " ") | dim}) |
                       flex | border;
         }
 
